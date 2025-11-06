@@ -9,6 +9,7 @@ interface DocumentAttributes {
   filePath: string;
   fileSize: number;
   mimeType: string;
+  storageType: 'local' | 'minio';
   folderId?: number;
   uploadedBy: number;
   currentVersion: number;
@@ -18,7 +19,7 @@ interface DocumentAttributes {
   updatedAt?: Date;
 }
 
-interface DocumentCreationAttributes extends Optional<DocumentAttributes, 'id' | 'description' | 'folderId' | 'currentVersion' | 'isDeleted' | 'metadata'> {}
+interface DocumentCreationAttributes extends Optional<DocumentAttributes, 'id' | 'description' | 'folderId' | 'currentVersion' | 'isDeleted' | 'metadata' | 'storageType'> {}
 
 class Document extends Model<DocumentAttributes, DocumentCreationAttributes> implements DocumentAttributes {
   public id!: number;
@@ -28,6 +29,7 @@ class Document extends Model<DocumentAttributes, DocumentCreationAttributes> imp
   public filePath!: string;
   public fileSize!: number;
   public mimeType!: string;
+  public storageType!: 'local' | 'minio';
   public folderId?: number;
   public uploadedBy!: number;
   public currentVersion!: number;
@@ -76,6 +78,11 @@ Document.init(
     mimeType: {
       type: DataTypes.STRING(100),
       allowNull: false,
+    },
+    storageType: {
+      type: DataTypes.ENUM('local', 'minio'),
+      allowNull: false,
+      defaultValue: 'local',
     },
     folderId: {
       type: DataTypes.INTEGER,

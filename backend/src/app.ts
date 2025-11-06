@@ -5,9 +5,11 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import sequelize, { testConnection } from './config/database';
 import { syncDatabase } from './models';
+import { initializeBucket } from './services/minioService';
 import authRoutes from './routes/authRoutes';
 import documentRoutes from './routes/documentRoutes';
 import folderRoutes from './routes/folderRoutes';
+import userRoutes from './routes/userRoutes';
 
 dotenv.config();
 
@@ -33,6 +35,7 @@ app.get('/', (req: Request, res: Response) => {
       auth: '/api/auth',
       documents: '/api/documents',
       folders: '/api/folders',
+      users: '/api/users',
     },
   });
 });
@@ -40,6 +43,7 @@ app.get('/', (req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/folders', folderRoutes);
+app.use('/api/users', userRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -73,6 +77,15 @@ const startServer = async () => {
     // Sync database models (for development)
     // In production, use migrations instead
     await syncDatabase(false); // Set to true to force recreate tables
+    
+    // Initialize MinIO if enabled
+    if (process.env.USE_MINIO === 'true') {
+      console.log('🗄️  Initializing MinIO storage...');
+      await initializeBucket();
+      console.log('✅ MinIO storage initialized');
+    } else {
+      console.log('📁 Using local file storage');
+    }
     
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);

@@ -8,11 +8,11 @@ import {
   deleteDocument,
 } from '../controllers/documentController';
 import { authenticate, authorize } from '../middleware/auth';
-import upload from '../middleware/upload';
+import { uploadWithMinio } from '../middleware/uploadWithMinio';
 
 const router = Router();
 
-router.post('/', authenticate, upload.single('file'), uploadDocument);
+router.post('/', authenticate, uploadWithMinio('file'), uploadDocument);
 router.get('/', authenticate, getDocuments);
 router.get('/:id', authenticate, getDocumentById);
 router.get('/:id/download', authenticate, downloadDocument);

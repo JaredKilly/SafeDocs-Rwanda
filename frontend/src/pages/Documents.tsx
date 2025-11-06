@@ -32,7 +32,9 @@ import { logout } from '../store/authSlice';
 import { fetchDocuments, deleteDocument, fetchFolders } from '../store/documentsSlice';
 import { AppDispatch, RootState } from '../store';
 import UploadDocumentModal from '../components/UploadDocumentModal';
+import DocumentPreview from '../components/DocumentPreview';
 import apiService from '../services/api';
+import { Document } from '../types';
 
 const Documents: React.FC = () => {
   const navigate = useNavigate();
@@ -41,6 +43,8 @@ const Documents: React.FC = () => {
   const { documents, loading } = useSelector((state: RootState) => state.documents);
 
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
@@ -67,6 +71,17 @@ const Documents: React.FC = () => {
   const handleMenuClose = () => {
     setAnchorEl(null);
     setSelectedDocId(null);
+  };
+
+  const handlePreview = (doc: Document) => {
+    setSelectedDocument(doc);
+    setPreviewModalOpen(true);
+    handleMenuClose();
+  };
+
+  const handlePreviewClose = () => {
+    setPreviewModalOpen(false);
+    setSelectedDocument(null);
   };
 
   const handleDownload = async (docId: number, fileName: string) => {
@@ -122,9 +137,16 @@ const Documents: React.FC = () => {
     <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
       <AppBar position="static">
         <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            SafeDocs Rwanda - Documents
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+            <img 
+              src="/logo.png" 
+              alt="SafeDocs Rwanda Logo" 
+              style={{ height: '40px', marginRight: '16px' }}
+            />
+            <Typography variant="h6" component="div">
+              SafeDocs Rwanda
+            </Typography>
+          </Box>
           <Button color="inherit" onClick={() => navigate('/dashboard')} sx={{ mr: 2 }}>
             Dashboard
           </Button>
@@ -245,6 +267,12 @@ const Documents: React.FC = () => {
                 <CardActions>
                   <Button
                     size="small"
+                    onClick={() => handlePreview(doc)}
+                  >
+                    Preview
+                  </Button>
+                  <Button
+                    size="small"
                     startIcon={<DownloadIcon />}
                     onClick={() => handleDownload(doc.id, doc.fileName)}
                   >
@@ -262,6 +290,12 @@ const Documents: React.FC = () => {
           open={Boolean(anchorEl)}
           onClose={handleMenuClose}
         >
+          <MenuItem onClick={() => {
+            const doc = documents.find(d => d.id === selectedDocId);
+            if (doc) handlePreview(doc);
+          }}>
+            <DocumentIcon sx={{ mr: 1 }} /> Preview
+          </MenuItem>
           <MenuItem onClick={() => selectedDocId && handleDownload(selectedDocId, documents.find(d => d.id === selectedDocId)?.fileName || '')}>
             <DownloadIcon sx={{ mr: 1 }} /> Download
           </MenuItem>
@@ -275,6 +309,13 @@ const Documents: React.FC = () => {
       <UploadDocumentModal
         open={uploadModalOpen}
         onClose={() => setUploadModalOpen(false)}
+      />
+
+      {/* Preview Modal */}
+      <DocumentPreview
+        open={previewModalOpen}
+        onClose={handlePreviewClose}
+        document={selectedDocument}
       />
     </Box>
   );

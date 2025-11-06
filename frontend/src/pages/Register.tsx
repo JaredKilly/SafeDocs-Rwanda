@@ -79,6 +79,13 @@ const Register: React.FC = () => {
         }}
       >
         <Paper elevation={3} sx={{ padding: 4, width: '100%' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+            <img 
+              src="/logo.png" 
+              alt="SafeDocs Rwanda Logo" 
+              style={{ maxWidth: '200px', height: 'auto' }}
+            />
+          </Box>
           <Typography component="h1" variant="h4" align="center" gutterBottom>
             SafeDocs Rwanda
           </Typography>

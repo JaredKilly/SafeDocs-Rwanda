@@ -3,6 +3,7 @@ import { Document, User, Folder, Tag, AuditLog } from '../models';
 import { Op } from 'sequelize';
 import fs from 'fs';
 import path from 'path';
+import { getFileStream } from '../middleware/uploadWithMinio';
 
 export const uploadDocument = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -26,6 +27,7 @@ export const uploadDocument = async (req: Request, res: Response): Promise<void>
       filePath: req.file.path,
       fileSize: req.file.size,
       mimeType: req.file.mimetype,
+      storageType: (req.file as any).storageType || 'local',
       folderId: folderId || null,
       uploadedBy: req.user.userId,
     });
@@ -169,21 +171,30 @@ export const downloadDocument = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    if (!fs.existsSync(document.filePath)) {
+    // Check if file exists and get the stream
+    try {
+      const fileStream = await getFileStream(document.filePath, document.storageType);
+      
+      // Log audit trail
+      await AuditLog.create({
+        userId: req.user.userId,
+        documentId: document.id,
+        action: 'DOCUMENT_DOWNLOADED',
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      // Set headers
+      res.setHeader('Content-Type', document.mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${document.fileName}"`);
+      
+      // Pipe the file stream to response
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error('File download error:', error);
       res.status(404).json({ error: 'File not found on server' });
       return;
     }
-
-    // Log audit trail
-    await AuditLog.create({
-      userId: req.user.userId,
-      documentId: document.id,
-      action: 'DOCUMENT_DOWNLOADED',
-      ipAddress: req.ip,
-      userAgent: req.get('user-agent'),
-    });
-
-    res.download(document.filePath, document.fileName);
   } catch (error) {
     console.error('Download document error:', error);
     res.status(500).json({ error: 'Internal server error' });

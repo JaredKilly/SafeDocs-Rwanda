@@ -49,6 +49,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     // Generate token
     const token = generateToken({
+      id: user.id,
       userId: user.id,
       username: user.username,
       email: user.email,
@@ -106,6 +107,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // Generate token
     const token = generateToken({
+      id: user.id,
       userId: user.id,
       username: user.username,
       email: user.email,
