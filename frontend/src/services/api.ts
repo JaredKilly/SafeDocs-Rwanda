@@ -79,8 +79,8 @@ class ApiService {
   }
 
   async getDocuments(params?: SearchParams): Promise<Document[]> {
-    const response = await this.api.get<Document[]>('/documents', { params });
-    return response.data;
+    const response = await this.api.get<{ documents: Document[]; pagination: any }>('/documents', { params });
+    return response.data.documents;
   }
 
   async getDocument(id: number): Promise<Document> {
@@ -118,13 +118,13 @@ class ApiService {
   }
 
   async getFolders(): Promise<Folder[]> {
-    const response = await this.api.get<Folder[]>('/folders');
-    return response.data;
+    const response = await this.api.get<{ folders: Folder[] }>('/folders');
+    return response.data.folders;
   }
 
   async getFolderTree(): Promise<Folder[]> {
-    const response = await this.api.get<Folder[]>('/folders/tree');
-    return response.data;
+    const response = await this.api.get<{ tree: Folder[] }>('/folders/tree');
+    return response.data.tree;
   }
 
   async getFolder(id: number): Promise<Folder> {
