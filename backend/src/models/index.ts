@@ -1,3 +1,4 @@
+import sequelize from '../config/database';
 import User from './User';
 import Folder from './Folder';
 import Document from './Document';
@@ -11,6 +12,9 @@ import ShareLink from './ShareLink';
 import AccessRequest from './AccessRequest';
 import FileChecksum from './FileChecksum';
 import EncryptionMetadata from './EncryptionMetadata';
+import DocumentVersion from './DocumentVersion';
+import Employee from './Employee';
+import EmployeeDocument from './EmployeeDocument';
 
 // User relationships
 User.hasMany(Folder, { foreignKey: 'createdBy', as: 'folders' });
@@ -21,6 +25,7 @@ User.belongsToMany(Group, { through: GroupMember, foreignKey: 'userId', otherKey
 User.hasMany(DocumentPermission, { foreignKey: 'grantedBy', as: 'grantedPermissions' });
 User.hasMany(ShareLink, { foreignKey: 'createdBy', as: 'shareLinks' });
 User.hasMany(AccessRequest, { foreignKey: 'requesterId', as: 'accessRequests' });
+User.hasMany(Employee, { foreignKey: 'createdBy', as: 'employeesCreated' });
 
 // Folder relationships
 Folder.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
@@ -39,6 +44,10 @@ Document.hasMany(ShareLink, { foreignKey: 'documentId', as: 'shareLinks' });
 Document.hasMany(AccessRequest, { foreignKey: 'documentId', as: 'accessRequests' });
 Document.hasOne(FileChecksum, { foreignKey: 'documentId', as: 'checksum' });
 Document.hasOne(EncryptionMetadata, { foreignKey: 'documentId', as: 'encryption' });
+Document.hasMany(DocumentVersion, { foreignKey: 'documentId', as: 'versions' });
+Document.belongsToMany(Employee, { through: EmployeeDocument, foreignKey: 'documentId', otherKey: 'employeeId', as: 'linkedEmployees' });
+DocumentVersion.belongsTo(Document, { foreignKey: 'documentId', as: 'document' });
+DocumentVersion.belongsTo(User, { foreignKey: 'uploadedBy', as: 'uploader' });
 
 // Tag relationships
 Tag.belongsToMany(Document, { through: 'document_tags', foreignKey: 'tagId', otherKey: 'documentId', as: 'documents' });
@@ -74,11 +83,21 @@ FileChecksum.belongsTo(Document, { foreignKey: 'documentId', as: 'document' });
 // EncryptionMetadata relationships
 EncryptionMetadata.belongsTo(Document, { foreignKey: 'documentId', as: 'document' });
 
-export { 
-  User, 
-  Folder, 
-  Document, 
-  Tag, 
+// Employee relationships
+Employee.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
+Employee.belongsToMany(Document, { through: EmployeeDocument, foreignKey: 'employeeId', otherKey: 'documentId', as: 'documents' });
+Employee.hasMany(EmployeeDocument, { foreignKey: 'employeeId', as: 'employeeDocuments' });
+
+// EmployeeDocument relationships
+EmployeeDocument.belongsTo(Employee, { foreignKey: 'employeeId', as: 'employee' });
+EmployeeDocument.belongsTo(Document, { foreignKey: 'documentId', as: 'document' });
+EmployeeDocument.belongsTo(User, { foreignKey: 'addedBy', as: 'addedByUser' });
+
+export {
+  User,
+  Folder,
+  Document,
+  Tag,
   AuditLog,
   Group,
   GroupMember,
@@ -87,24 +106,43 @@ export {
   ShareLink,
   AccessRequest,
   FileChecksum,
-  EncryptionMetadata
+  EncryptionMetadata,
+  DocumentVersion,
+  Employee,
+  EmployeeDocument,
 };
 
 export const syncDatabase = async (force: boolean = false) => {
+  const opts = { force };
   try {
-    await User.sync({ force });
-    await Group.sync({ force });
-    await GroupMember.sync({ force });
-    await Folder.sync({ force });
-    await FolderPermission.sync({ force });
-    await Tag.sync({ force });
-    await Document.sync({ force });
-    await DocumentPermission.sync({ force });
-    await ShareLink.sync({ force });
-    await AccessRequest.sync({ force });
-    await FileChecksum.sync({ force });
-    await EncryptionMetadata.sync({ force });
-    await AuditLog.sync({ force });
+    // Sync all tables — creates tables that don't exist, no destructive alters
+    await User.sync(opts);
+    await Group.sync(opts);
+    await GroupMember.sync(opts);
+    await Folder.sync(opts);
+    await FolderPermission.sync(opts);
+    await Tag.sync(opts);
+    await Document.sync(opts);
+    await DocumentPermission.sync(opts);
+    await ShareLink.sync(opts);
+    await AccessRequest.sync(opts);
+    await FileChecksum.sync(opts);
+    await EncryptionMetadata.sync(opts);
+    await DocumentVersion.sync(opts);
+    await AuditLog.sync(opts);
+    await Employee.sync(opts);
+    await EmployeeDocument.sync(opts);
+
+    // Safe idempotent column patches — ADD COLUMN IF NOT EXISTS never fails on re-run
+    if (!force) {
+      await sequelize.query(
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS "tokenVersion" INTEGER NOT NULL DEFAULT 0`
+      );
+      await sequelize.query(
+        `ALTER TABLE documents ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP WITH TIME ZONE`
+      );
+    }
+
     console.log('✅ All models synchronized successfully');
   } catch (error) {
     console.error('❌ Error synchronizing models:', error);

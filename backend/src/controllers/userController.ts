@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Op } from 'sequelize';
 import User from '../models/User';
 
 // Get current user profile
@@ -90,12 +91,79 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
 
     // Update password
     user.password = newPassword;
+    user.tokenVersion += 1;
     await user.save();
 
     res.json({ message: 'Password changed successfully' });
   } catch (error) {
     console.error('Change password error:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Search users — accessible to all authenticated users (for sharing)
+export const searchUsers = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const q = ((req.query.q as string) || '').trim();
+    if (!q || q.length < 2) {
+      res.status(200).json([]);
+      return;
+    }
+    const users = await User.findAll({
+      where: {
+        [Op.or]: [
+          { username: { [Op.iLike]: `%${q}%` } },
+          { fullName: { [Op.iLike]: `%${q}%` } },
+          { email: { [Op.iLike]: `%${q}%` } },
+        ],
+        isActive: true,
+      },
+      attributes: ['id', 'username', 'fullName', 'email'],
+      limit: 20,
+      order: [['username', 'ASC']],
+    });
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Search users error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Admin: Create a user
+export const createUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { username, email, password, fullName, role = 'user' } = req.body;
+
+    if (!username || !email || !password) {
+      res.status(400).json({ error: 'Username, email, and password are required' });
+      return;
+    }
+
+    if (password.length < 6) {
+      res.status(400).json({ error: 'Password must be at least 6 characters' });
+      return;
+    }
+
+    if (!['admin', 'manager', 'user'].includes(role)) {
+      res.status(400).json({ error: 'Invalid role' });
+      return;
+    }
+
+    const existing = await User.findOne({
+      where: { [Op.or]: [{ username }, { email }] },
+    });
+    if (existing) {
+      res.status(409).json({ error: 'Username or email already exists' });
+      return;
+    }
+
+    const user = await User.create({ username, email, password, fullName, role, tokenVersion: 0 });
+
+    const created = await User.findByPk(user.id, { attributes: { exclude: ['password'] } });
+    res.status(201).json({ message: 'User created successfully', user: created });
+  } catch (error) {
+    console.error('Create user error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -157,6 +225,7 @@ export const toggleUserStatus = async (req: Request, res: Response): Promise<voi
     }
 
     user.isActive = !user.isActive;
+    user.tokenVersion += 1;
     await user.save();
 
     const updatedUser = await User.findByPk(userId, {

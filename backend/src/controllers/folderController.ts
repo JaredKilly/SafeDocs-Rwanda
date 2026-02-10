@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Folder, User, Document } from '../models';
+import { AccessLevel, checkFolderPermission } from '../services/permissionService';
 
 export const createFolder = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -21,6 +22,12 @@ export const createFolder = async (req: Request, res: Response): Promise<void> =
       const parentFolder = await Folder.findByPk(parentId);
       if (!parentFolder) {
         res.status(404).json({ error: 'Parent folder not found' });
+        return;
+      }
+
+      const canCreate = await checkFolderPermission(req.user.userId, parentId, AccessLevel.EDITOR);
+      if (!canCreate) {
+        res.status(403).json({ error: 'You do not have permission to create a subfolder here' });
         return;
       }
       path = `${parentFolder.path}/${name}`;
@@ -66,7 +73,19 @@ export const getFolders = async (req: Request, res: Response): Promise<void> => 
       order: [['name', 'ASC']],
     });
 
-    res.status(200).json({ folders });
+    const accessibleFolders = [];
+    for (const folder of folders) {
+      const canView = await checkFolderPermission(
+        req.user.userId,
+        folder.id,
+        AccessLevel.VIEWER
+      );
+      if (canView) {
+        accessibleFolders.push(folder);
+      }
+    }
+
+    res.status(200).json({ folders: accessibleFolders });
   } catch (error) {
     console.error('Get folders error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -102,6 +121,17 @@ export const getFolderById = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
+    const hasPermission = await checkFolderPermission(
+      req.user.userId,
+      Number(id),
+      AccessLevel.VIEWER
+    );
+
+    if (!hasPermission) {
+      res.status(403).json({ error: 'You do not have permission to view this folder' });
+      return;
+    }
+
     res.status(200).json({ folder });
   } catch (error) {
     console.error('Get folder error:', error);
@@ -123,6 +153,17 @@ export const updateFolder = async (req: Request, res: Response): Promise<void> =
 
     if (!folder) {
       res.status(404).json({ error: 'Folder not found' });
+      return;
+    }
+
+    const hasPermission = await checkFolderPermission(
+      req.user.userId,
+      Number(id),
+      AccessLevel.EDITOR
+    );
+
+    if (!hasPermission) {
+      res.status(403).json({ error: 'You do not have permission to update this folder' });
       return;
     }
 
@@ -170,6 +211,15 @@ export const deleteFolder = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
+    const canDelete =
+      req.user.role === 'admin' ||
+      (await checkFolderPermission(req.user.userId, Number(id), AccessLevel.OWNER));
+
+    if (!canDelete) {
+      res.status(403).json({ error: 'You do not have permission to delete this folder' });
+      return;
+    }
+
     // Check if folder has children or documents
     const children = await Folder.count({ where: { parentId: id } });
     const documents = await Document.count({ where: { folderId: id, isDeleted: false } });
@@ -213,7 +263,19 @@ export const getFolderTree = async (req: Request, res: Response): Promise<void> 
       order: [['name', 'ASC']],
     });
 
-    res.status(200).json({ tree: rootFolders });
+    const accessibleRoots = [];
+    for (const folder of rootFolders) {
+      const canView = await checkFolderPermission(
+        req.user.userId,
+        folder.id,
+        AccessLevel.VIEWER
+      );
+      if (canView) {
+        accessibleRoots.push(folder);
+      }
+    }
+
+    res.status(200).json({ tree: accessibleRoots });
   } catch (error) {
     console.error('Get folder tree error:', error);
     res.status(500).json({ error: 'Internal server error' });

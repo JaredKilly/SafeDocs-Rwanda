@@ -1,9 +1,10 @@
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import {
   User,
   AuthResponse,
   LoginCredentials,
   RegisterData,
+  HealthStatus,
   Document,
   Folder,
   FolderCreate,
@@ -11,6 +12,11 @@ import {
   TagCreate,
   AuditLog,
   SearchParams,
+  DocumentPermission,
+  ShareLink,
+  Group,
+  GroupMemberDetails,
+  AccessRequest,
 } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -42,7 +48,11 @@ class ApiService {
     this.api.interceptors.response.use(
       (response) => response,
       (error) => {
-        if (error.response?.status === 401) {
+        // Only force-logout on 401 for authenticated requests.
+        // Skip /auth/login and /auth/register so login errors surface normally.
+        const url = error.config?.url || '';
+        const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register');
+        if (error.response?.status === 401 && !isAuthEndpoint) {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           window.location.href = '/login';
@@ -60,6 +70,11 @@ class ApiService {
 
   async register(data: RegisterData): Promise<AuthResponse> {
     const response = await this.api.post<AuthResponse>('/auth/register', data);
+    return response.data;
+  }
+
+  async getHealth(): Promise<HealthStatus> {
+    const response = await this.api.get<HealthStatus>('/health');
     return response.data;
   }
 
@@ -89,8 +104,8 @@ class ApiService {
   }
 
   async updateDocument(id: number, data: Partial<Document>): Promise<Document> {
-    const response = await this.api.put<Document>(`/documents/${id}`, data);
-    return response.data;
+    const response = await this.api.put<{ message: string; document: Document }>(`/documents/${id}`, data);
+    return response.data.document;
   }
 
   async deleteDocument(id: number): Promise<void> {
@@ -161,9 +176,381 @@ class ApiService {
     await this.api.delete(`/tags/${id}`);
   }
 
+  // Sharing
+  async shareDocument(
+    documentId: number,
+    data: {
+      targetType: 'user' | 'group' | 'role';
+      targetId: string;
+      accessLevel: 'viewer' | 'commenter' | 'editor' | 'owner';
+      expiresAt?: string;
+    }
+  ): Promise<DocumentPermission> {
+    const response = await this.api.post<{ message: string; permission: DocumentPermission }>(
+      `/shares/document/${documentId}`,
+      data
+    );
+    return response.data.permission;
+  }
+
+  async getDocumentShares(documentId: number): Promise<DocumentPermission[]> {
+    const response = await this.api.get<{ permissions: DocumentPermission[] }>(
+      `/shares/document/${documentId}`
+    );
+    return response.data.permissions;
+  }
+
+  async revokeDocumentShare(permissionId: number): Promise<void> {
+    await this.api.delete(`/shares/${permissionId}`);
+  }
+
+  async createShareLink(
+    documentId: number,
+    data: {
+      password?: string;
+      expiresAt?: string;
+      maxUses?: number;
+      allowDownload?: boolean;
+      accessLevel?: 'viewer' | 'commenter';
+      emailTo?: string;
+    }
+  ): Promise<ShareLink> {
+    const response = await this.api.post<{ message: string; shareLink: ShareLink }>(
+      `/shares/link/${documentId}`,
+      data
+    );
+    return response.data.shareLink;
+  }
+
+  async getDocumentShareLinks(documentId: number): Promise<ShareLink[]> {
+    const response = await this.api.get<{ shareLinks: ShareLink[] }>(
+      `/shares/link/${documentId}/list`
+    );
+    return response.data.shareLinks;
+  }
+
+  async deactivateShareLink(token: string): Promise<void> {
+    await this.api.delete(`/shares/link/${token}`);
+  }
+
+  // Access Requests
+  async submitAccessRequest(data: {
+    documentId: number;
+    message?: string;
+    requestedAccess: 'viewer' | 'commenter' | 'editor';
+  }): Promise<AccessRequest> {
+    const response = await this.api.post<{ message: string; accessRequest: AccessRequest }>(
+      '/access-requests',
+      data
+    );
+    return response.data.accessRequest;
+  }
+
+  async getPendingAccessRequests(): Promise<AccessRequest[]> {
+    const response = await this.api.get<{ requests: AccessRequest[] }>('/access-requests/pending');
+    return response.data.requests;
+  }
+
+  async getMyAccessRequests(): Promise<AccessRequest[]> {
+    const response = await this.api.get<{ requests: AccessRequest[] }>('/access-requests/mine');
+    return response.data.requests;
+  }
+
+  async approveAccessRequest(
+    requestId: number,
+    data: { accessLevel?: 'viewer' | 'commenter' | 'editor'; response?: string }
+  ): Promise<AccessRequest> {
+    const response = await this.api.patch<{ message: string; accessRequest: AccessRequest }>(
+      `/access-requests/${requestId}/approve`,
+      data
+    );
+    return response.data.accessRequest;
+  }
+
+  async denyAccessRequest(requestId: number, data: { response?: string }): Promise<AccessRequest> {
+    const response = await this.api.patch<{ message: string; accessRequest: AccessRequest }>(
+      `/access-requests/${requestId}/deny`,
+      data
+    );
+    return response.data.accessRequest;
+  }
+
+  // Groups
+  async createGroup(data: { name: string; description?: string }): Promise<Group> {
+    const response = await this.api.post<{ message: string; group: Group }>('/groups', data);
+    return response.data.group;
+  }
+
+  async getGroups(): Promise<Group[]> {
+    const response = await this.api.get<{ groups: Group[] }>('/groups');
+    return response.data.groups;
+  }
+
+  async getGroup(id: number): Promise<{ group: Group; userRole: 'admin' | 'member' }> {
+    const response = await this.api.get<{ group: Group; userRole: 'admin' | 'member' }>(
+      `/groups/${id}`
+    );
+    return response.data;
+  }
+
+  async updateGroup(id: number, data: { name?: string; description?: string }): Promise<Group> {
+    const response = await this.api.put<{ message: string; group: Group }>(
+      `/groups/${id}`,
+      data
+    );
+    return response.data.group;
+  }
+
+  async deleteGroup(id: number): Promise<void> {
+    await this.api.delete(`/groups/${id}`);
+  }
+
+  async addGroupMember(
+    groupId: number,
+    data: { userId: number; role?: 'admin' | 'member' }
+  ): Promise<GroupMemberDetails> {
+    const response = await this.api.post<{ message: string; membership: GroupMemberDetails }>(
+      `/groups/${groupId}/members`,
+      data
+    );
+    return response.data.membership;
+  }
+
+  async removeGroupMember(groupId: number, userId: number): Promise<void> {
+    await this.api.delete(`/groups/${groupId}/members/${userId}`);
+  }
+
+  async updateGroupMemberRole(
+    groupId: number,
+    userId: number,
+    role: 'admin' | 'member'
+  ): Promise<GroupMemberDetails> {
+    const response = await this.api.put<{ message: string; membership: GroupMemberDetails }>(
+      `/groups/${groupId}/members/${userId}/role`,
+      { role }
+    );
+    return response.data.membership;
+  }
+
+  // OCR
+  async processOCR(formData: FormData): Promise<{
+    success: boolean;
+    data: {
+      text: string;
+      confidence?: number;
+      language?: string;
+      processingTime?: number;
+    };
+  }> {
+    const response = await this.api.post('/ocr/process', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  }
+
+  async getOCRStatus(): Promise<{
+    available: boolean;
+    enabled: boolean;
+    configured: boolean;
+    endpoint: string;
+    mode: string;
+  }> {
+    const response = await this.api.get('/ocr/status');
+    return response.data;
+  }
+
+  // WIA Scanner
+  async listScannerDevices(): Promise<{ id: string; name: string }[]> {
+    const response = await this.api.get<{ scanners: { id: string; name: string }[] }>('/scanner/devices');
+    return response.data.scanners;
+  }
+
+  async scanFromDevice(deviceId: string, colorMode = 4, dpi = 300): Promise<File> {
+    const response = await this.api.post(
+      '/scanner/scan',
+      { deviceId, colorMode, dpi },
+      { responseType: 'blob' }
+    );
+    const blob = response.data as Blob;
+    return new File([blob], `scan_${Date.now()}.jpg`, { type: 'image/jpeg' });
+  }
+
+  // ── HR ──────────────────────────────────────────────────────
+  async getHRStats(): Promise<import('../types').HRStats> {
+    const r = await this.api.get('/hr/stats');
+    return r.data;
+  }
+
+  async getEmployees(params?: { q?: string; department?: string; status?: string }): Promise<import('../types').Employee[]> {
+    const r = await this.api.get('/hr', { params });
+    return r.data;
+  }
+
+  async getEmployee(id: number): Promise<import('../types').Employee> {
+    const r = await this.api.get(`/hr/${id}`);
+    return r.data;
+  }
+
+  async createEmployee(data: Partial<import('../types').Employee>): Promise<import('../types').Employee> {
+    const r = await this.api.post('/hr', data);
+    return r.data;
+  }
+
+  async updateEmployee(id: number, data: Partial<import('../types').Employee>): Promise<import('../types').Employee> {
+    const r = await this.api.put(`/hr/${id}`, data);
+    return r.data;
+  }
+
+  async deleteEmployee(id: number): Promise<void> {
+    await this.api.delete(`/hr/${id}`);
+  }
+
+  async linkDocumentToEmployee(employeeId: number, documentId: number, hrCategory: string): Promise<void> {
+    await this.api.post(`/hr/${employeeId}/documents`, { documentId, hrCategory });
+  }
+
+  async unlinkDocumentFromEmployee(employeeId: number, documentId: number): Promise<void> {
+    await this.api.delete(`/hr/${employeeId}/documents/${documentId}`);
+  }
+
+  async updateProfile(data: { fullName?: string; email?: string }): Promise<User> {
+    const response = await this.api.put<{ message: string; user: User }>('/auth/profile', data);
+    return response.data.user;
+  }
+
+  async changePassword(data: { currentPassword: string; newPassword: string }): Promise<void> {
+    await this.api.put('/auth/change-password', data);
+  }
+
+  // Search users (for sharing — available to all authenticated users)
+  async searchUsers(q: string): Promise<Pick<User, 'id' | 'username' | 'fullName' | 'email'>[]> {
+    const response = await this.api.get('/users/search', { params: { q } });
+    return response.data;
+  }
+
+  // Admin: User Management
+  async getAllUsers(): Promise<User[]> {
+    const response = await this.api.get<User[]>('/users/all');
+    return response.data;
+  }
+
+  async updateUserRole(userId: number, role: 'admin' | 'manager' | 'user'): Promise<User> {
+    const response = await this.api.put<User>(`/users/${userId}/role`, { role });
+    return response.data;
+  }
+
+  async toggleUserStatus(userId: number): Promise<User> {
+    const response = await this.api.patch<User>(`/users/${userId}/toggle-status`);
+    return response.data;
+  }
+
+  async deleteUser(userId: number): Promise<void> {
+    await this.api.delete(`/users/${userId}`);
+  }
+
+  async createUser(data: {
+    username: string;
+    email: string;
+    password: string;
+    fullName?: string;
+    role?: 'admin' | 'manager' | 'user';
+  }): Promise<User> {
+    const response = await this.api.post<{ user: User }>('/users', data);
+    return response.data.user;
+  }
+
+  // Document Versions
+  async getDocumentVersions(documentId: number): Promise<any[]> {
+    const response = await this.api.get(`/documents/${documentId}/versions`);
+    return response.data.versions ?? response.data;
+  }
+
+  async downloadDocumentVersion(documentId: number, versionId: number): Promise<Blob> {
+    const response = await this.api.get(
+      `/documents/${documentId}/versions/${versionId}/download`,
+      { responseType: 'blob' }
+    );
+    return response.data;
+  }
+
+  // Share link: update createShareLink to support emailTo
+  async createShareLinkWithEmail(
+    documentId: number,
+    data: {
+      password?: string;
+      expiresAt?: string;
+      maxUses?: number;
+      allowDownload?: boolean;
+      accessLevel?: 'viewer' | 'commenter';
+      emailTo?: string;
+    }
+  ): Promise<ShareLink> {
+    const response = await this.api.post<{ message: string; shareLink: ShareLink }>(
+      `/shares/link/${documentId}`,
+      data
+    );
+    return response.data.shareLink;
+  }
+
+  // ── Government ─────────────────────────────────────────────
+  async getGovDocuments(params?: { q?: string; classification?: string; refNumber?: string }): Promise<import('../types').Document[]> {
+    const r = await this.api.get('/gov/documents', { params });
+    return r.data;
+  }
+
+  async getGovStats(): Promise<{ total: number; byClassification: Record<string, number> }> {
+    const r = await this.api.get('/gov/stats');
+    return r.data;
+  }
+
+  async setGovMetadata(documentId: number, data: Record<string, any>): Promise<void> {
+    await this.api.put(`/gov/documents/${documentId}`, data);
+  }
+
+  async clearGovMetadata(documentId: number): Promise<void> {
+    await this.api.delete(`/gov/documents/${documentId}`);
+  }
+
+  // ── Healthcare ──────────────────────────────────────────────
+  async getHealthcareStats(): Promise<import('../types').HealthcareStats> {
+    const r = await this.api.get('/healthcare/stats');
+    return r.data;
+  }
+
+  async getHealthcareDocs(params?: {
+    q?: string;
+    recordType?: string;
+    privacyLevel?: string;
+    patientId?: string;
+  }): Promise<import('../types').Document[]> {
+    const r = await this.api.get('/healthcare/documents', { params });
+    return r.data;
+  }
+
+  async setHealthcareMetadata(
+    documentId: number,
+    data: import('../types').HCMeta
+  ): Promise<void> {
+    await this.api.put(`/healthcare/documents/${documentId}`, data);
+  }
+
+  async clearHealthcareMetadata(documentId: number): Promise<void> {
+    await this.api.delete(`/healthcare/documents/${documentId}`);
+  }
+
   // Audit Logs
-  async getAuditLogs(params?: any): Promise<AuditLog[]> {
-    const response = await this.api.get<AuditLog[]>('/audit-logs', { params });
+  async getAuditLogs(params?: {
+    page?: number;
+    limit?: number;
+    userId?: number;
+    documentId?: number;
+    action?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<{ logs: AuditLog[]; total: number; page: number; totalPages: number }> {
+    const response = await this.api.get('/audit-logs', { params });
     return response.data;
   }
 }

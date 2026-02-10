@@ -6,10 +6,20 @@ import dotenv from 'dotenv';
 import sequelize, { testConnection } from './config/database';
 import { syncDatabase } from './models';
 import { initializeBucket } from './services/minioService';
+import { generalLimiter, authLimiter } from './middleware/rateLimiter';
 import authRoutes from './routes/authRoutes';
 import documentRoutes from './routes/documentRoutes';
 import folderRoutes from './routes/folderRoutes';
 import userRoutes from './routes/userRoutes';
+import groupRoutes from './routes/groupRoutes';
+import shareRoutes from './routes/shareRoutes';
+import accessRequestRoutes from './routes/accessRequestRoutes';
+import ocrRoutes from './routes/ocrRoutes';
+import auditLogRoutes from './routes/auditLogRoutes';
+import scannerRoutes from './routes/scannerRoutes';
+import hrRoutes from './routes/hrRoutes';
+import govRoutes from './routes/govRoutes';
+import healthcareRoutes from './routes/healthcareRoutes';
 
 dotenv.config();
 
@@ -23,6 +33,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(morgan('dev'));
+app.use(generalLimiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -40,10 +51,42 @@ app.get('/', (req: Request, res: Response) => {
   });
 });
 
-app.use('/api/auth', authRoutes);
+// Health check
+app.get('/api/health', async (_req: Request, res: Response) => {
+  const started = Date.now();
+  try {
+    await sequelize.authenticate();
+    res.status(200).json({
+      status: 'ok',
+      database: 'ok',
+      uptime: process.uptime(),
+      responseTimeMs: Date.now() - started,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Health check failed:', error);
+    res.status(503).json({
+      status: 'error',
+      database: 'unavailable',
+      responseTimeMs: Date.now() - started,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/groups', groupRoutes);
+app.use('/api/shares', shareRoutes);
+app.use('/api/access-requests', accessRequestRoutes);
+app.use('/api/ocr', ocrRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/scanner', scannerRoutes);
+app.use('/api/hr', hrRoutes);
+app.use('/api/gov', govRoutes);
+app.use('/api/healthcare', healthcareRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -74,9 +117,12 @@ const startServer = async () => {
     // Test database connection
     await testConnection();
     
-    // Sync database models (for development)
-    // In production, use migrations instead
-    await syncDatabase(false); // Set to true to force recreate tables
+    // Sync database models only in development; use migrations otherwise
+    if (process.env.NODE_ENV === 'development') {
+      await syncDatabase(false); // Set to true to force recreate tables
+    } else {
+      console.log('Skipping syncDatabase in non-development environment. Run migrations instead.');
+    }
     
     // Initialize MinIO if enabled
     if (process.env.USE_MINIO === 'true') {

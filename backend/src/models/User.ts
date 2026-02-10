@@ -10,6 +10,7 @@ interface UserAttributes {
   fullName?: string;
   role: 'admin' | 'manager' | 'user';
   isActive: boolean;
+  tokenVersion: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -24,6 +25,7 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
   public fullName?: string;
   public role!: 'admin' | 'manager' | 'user';
   public isActive!: boolean;
+  public tokenVersion!: number;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 
@@ -86,6 +88,11 @@ User.init(
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: true,
+    },
+    tokenVersion: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
     },
   },
   {

@@ -57,6 +57,17 @@ export const deleteDocument = createAsyncThunk(
   }
 );
 
+export const updateDocument = createAsyncThunk(
+  'documents/updateDocument',
+  async ({ id, data }: { id: number; data: Partial<Document> }, { rejectWithValue }) => {
+    try {
+      return await apiService.updateDocument(id, data);
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to update document');
+    }
+  }
+);
+
 // Folder thunks
 export const fetchFolders = createAsyncThunk(
   'documents/fetchFolders',
@@ -159,6 +170,23 @@ const documentsSlice = createSlice({
         state.documents = state.documents.filter(doc => doc.id !== action.payload);
       })
       .addCase(deleteDocument.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Update Document
+    builder
+      .addCase(updateDocument.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateDocument.fulfilled, (state, action) => {
+        state.loading = false;
+        state.documents = state.documents.map(doc =>
+          doc.id === action.payload.id ? action.payload : doc
+        );
+      })
+      .addCase(updateDocument.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });

@@ -15,11 +15,12 @@ interface DocumentAttributes {
   currentVersion: number;
   isDeleted: boolean;
   metadata?: object;
+  expiresAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-interface DocumentCreationAttributes extends Optional<DocumentAttributes, 'id' | 'description' | 'folderId' | 'currentVersion' | 'isDeleted' | 'metadata' | 'storageType'> {}
+interface DocumentCreationAttributes extends Optional<DocumentAttributes, 'id' | 'description' | 'folderId' | 'currentVersion' | 'isDeleted' | 'metadata' | 'storageType' | 'expiresAt'> {}
 
 class Document extends Model<DocumentAttributes, DocumentCreationAttributes> implements DocumentAttributes {
   public id!: number;
@@ -35,6 +36,7 @@ class Document extends Model<DocumentAttributes, DocumentCreationAttributes> imp
   public currentVersion!: number;
   public isDeleted!: boolean;
   public metadata?: object;
+  public expiresAt?: Date;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -112,6 +114,10 @@ Document.init(
     },
     metadata: {
       type: DataTypes.JSONB,
+      allowNull: true,
+    },
+    expiresAt: {
+      type: DataTypes.DATE,
       allowNull: true,
     },
   },

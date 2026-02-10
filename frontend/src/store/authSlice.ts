@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { User, LoginCredentials, RegisterData } from '../types';
 import apiService from '../services/api';
 
@@ -28,7 +28,9 @@ export const login = createAsyncThunk(
       localStorage.setItem('user', JSON.stringify(response.user));
       return response;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Login failed');
+      const data = error.response?.data;
+      const msg = typeof data === 'string' ? data : (data?.error || data?.message);
+      return rejectWithValue(msg || 'Login failed');
     }
   }
 );
@@ -42,7 +44,9 @@ export const register = createAsyncThunk(
       localStorage.setItem('user', JSON.stringify(response.user));
       return response;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Registration failed');
+      return rejectWithValue(
+        error.response?.data?.error || error.response?.data?.message || 'Registration failed'
+      );
     }
   }
 );
