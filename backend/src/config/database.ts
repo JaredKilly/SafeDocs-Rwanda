@@ -44,9 +44,9 @@ export const testConnection = async () => {
         console.error('❌ Unable to connect to the database:', error);
         process.exit(1);
       }
-      console.warn(
-        `⚠️  DB connection attempt ${attempt}/${maxRetries} failed: ${(error as Error).message}. Retrying in ${retryDelayMs / 1000}s...`
-      );
+      const err = error as any;
+      const msg = err?.parent?.message || err?.original?.message || err?.message || String(error);
+      console.warn(`⚠️  DB connection attempt ${attempt}/${maxRetries} failed: ${msg}. Retrying in ${retryDelayMs / 1000}s...`);
       await new Promise(resolve => setTimeout(resolve, retryDelayMs));
     }
   }
