@@ -34,7 +34,7 @@ const contactInfo = [
     icon: <PhoneIcon sx={{ fontSize: 28 }} />,
     color: '#00B89F',
     label: 'Call Us',
-    value: '+250 788 000 000',
+    value: '+250 792 875 283',
     sub: 'Mon – Fri, 8 am – 6 pm CAT',
   },
   {
