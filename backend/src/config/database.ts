@@ -31,8 +31,8 @@ const sequelize = dbUrl
     });
 
 export const testConnection = async () => {
-  const maxRetries = 10;
-  const retryDelayMs = 3000;
+  const maxRetries = 5;
+  const retryDelayMs = 2000;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -45,7 +45,7 @@ export const testConnection = async () => {
         process.exit(1);
       }
       console.warn(
-        `⚠️  DB connection attempt ${attempt}/${maxRetries} failed. Retrying in ${retryDelayMs / 1000}s...`
+        `⚠️  DB connection attempt ${attempt}/${maxRetries} failed: ${(error as Error).message}. Retrying in ${retryDelayMs / 1000}s...`
       );
       await new Promise(resolve => setTimeout(resolve, retryDelayMs));
     }
