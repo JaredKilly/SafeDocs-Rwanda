@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Op } from 'sequelize';
-import { Employee, EmployeeDocument, Document, User } from '../models';
+import { Employee, EmployeeDocument, Document, User, AuditLog } from '../models';
 
 // ── Employees ────────────────────────────────────────────────
 
@@ -8,6 +8,13 @@ export const getEmployees = async (req: Request, res: Response): Promise<void> =
   try {
     const { q, department, status } = req.query;
     const where: any = {};
+
+    // Org scoping: non-admin users only see their org's employees; admins see all
+    const orgId = (req.user as any)?.organizationId;
+    const role = (req.user as any)?.role;
+    if (orgId && role !== 'admin') {
+      where.organizationId = orgId;
+    }
 
     if (q) {
       where[Op.or] = [
@@ -93,6 +100,7 @@ export const createEmployee = async (req: Request, res: Response): Promise<void>
       status: status || 'active',
       notes,
       createdBy: req.user!.id,
+      organizationId: (req.user as any).organizationId ?? undefined,
     });
 
     res.status(201).json(employee);
@@ -194,22 +202,127 @@ export const unlinkDocument = async (req: Request, res: Response): Promise<void>
   }
 };
 
+// ── HR Document Classification (by Organization) ──────────────
+
+export const HR_CATEGORIES = [
+  'contract', 'id_copy', 'certificate', 'performance_review',
+  'onboarding', 'medical', 'payslip', 'other',
+] as const;
+
+export const getHRDocs = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { q, organization, hrCategory } = req.query;
+
+    const where: any = {
+      isDeleted: false,
+      metadata: { [Op.ne]: null },
+    };
+
+    // Org scoping: non-admin users only; admins see all
+    const hrOrgId = (req.user as any).organizationId;
+    const hrRole = (req.user as any)?.role;
+    if (hrOrgId && hrRole !== 'admin') {
+      where.organizationId = hrOrgId;
+    }
+
+    const docs = await Document.findAll({ where, order: [['createdAt', 'DESC']], limit: 200 });
+
+    const filtered = docs.filter(d => {
+      const m = d.metadata as any;
+      if (!m?.hrOrganization && !m?.hrCategory) return false;
+      if (organization && m.hrOrganization !== organization) return false;
+      if (hrCategory && m.hrCategory !== hrCategory) return false;
+      if (q) {
+        const query = String(q).toLowerCase();
+        if (!d.title.toLowerCase().includes(query) &&
+          !String(m.hrOrganization || '').toLowerCase().includes(query) &&
+          !String(m.hrDepartment || '').toLowerCase().includes(query)) return false;
+      }
+      return true;
+    });
+
+    res.json(filtered);
+  } catch (error) {
+    console.error('getHRDocs error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const setHRDocMetadata = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { hrOrganization, hrDepartment, hrCategory } = req.body;
+
+    const doc = await Document.findOne({ where: { id, isDeleted: false } });
+    if (!doc) { res.status(404).json({ error: 'Document not found' }); return; }
+
+    const existing = (doc.metadata as any) || {};
+    const updated = {
+      ...existing,
+      ...(hrOrganization !== undefined && { hrOrganization }),
+      ...(hrDepartment !== undefined && { hrDepartment }),
+      ...(hrCategory !== undefined && { hrCategory }),
+    };
+    doc.metadata = updated;
+    await doc.save();
+
+    await AuditLog.create({
+      userId: req.user!.id,
+      documentId: doc.id,
+      action: 'update',
+      details: { message: `HR metadata updated: org=${hrOrganization}, category=${hrCategory}` },
+      ipAddress: req.ip,
+    });
+
+    res.json({ message: 'HR document metadata saved', document: doc });
+  } catch (error) {
+    console.error('setHRDocMetadata error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const clearHRDocMetadata = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const doc = await Document.findOne({ where: { id, isDeleted: false } });
+    if (!doc) { res.status(404).json({ error: 'Document not found' }); return; }
+
+    const existing = (doc.metadata as any) || {};
+    const { hrOrganization, hrDepartment, hrCategory, ...rest } = existing;
+    doc.metadata = Object.keys(rest).length ? rest : undefined;
+    await doc.save();
+
+    res.json({ message: 'HR document metadata cleared' });
+  } catch (error) {
+    console.error('clearHRDocMetadata error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 // ── HR Dashboard Stats ────────────────────────────────────────
 
-export const getHRStats = async (_req: Request, res: Response): Promise<void> => {
+export const getHRStats = async (req: Request, res: Response): Promise<void> => {
   try {
     const now = new Date();
     const in30 = new Date(now); in30.setDate(now.getDate() + 30);
     const in60 = new Date(now); in60.setDate(now.getDate() + 60);
 
+    // Org scoping for employee counts: non-admin users only; admins see all
+    const statsOrgId = (req.user as any)?.organizationId;
+    const statsRole = (req.user as any)?.role;
+    const empWhere: any = {};
+    if (statsOrgId && statsRole !== 'admin') {
+      empWhere.organizationId = statsOrgId;
+    }
+
     const [total, active, inactive, terminated] = await Promise.all([
-      Employee.count(),
-      Employee.count({ where: { status: 'active' } }),
-      Employee.count({ where: { status: 'inactive' } }),
-      Employee.count({ where: { status: 'terminated' } }),
+      Employee.count({ where: empWhere }),
+      Employee.count({ where: { ...empWhere, status: 'active' } }),
+      Employee.count({ where: { ...empWhere, status: 'inactive' } }),
+      Employee.count({ where: { ...empWhere, status: 'terminated' } }),
     ]);
 
-    // Documents expiring via HR links
+    // Documents expiring via HR links (scoped by org for non-admins)
     const expiringDocs = await EmployeeDocument.findAll({
       include: [
         {
@@ -224,6 +337,7 @@ export const getHRStats = async (_req: Request, res: Response): Promise<void> =>
         {
           model: Employee,
           as: 'employee',
+          where: empWhere,
           attributes: ['id', 'employeeId', 'fullName', 'department'],
         },
       ],
@@ -231,6 +345,7 @@ export const getHRStats = async (_req: Request, res: Response): Promise<void> =>
     });
 
     const departments = await Employee.findAll({
+      where: empWhere,
       attributes: ['department'],
       group: ['department'],
       order: [['department', 'ASC']],

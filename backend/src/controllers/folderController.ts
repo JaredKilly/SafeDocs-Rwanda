@@ -38,6 +38,7 @@ export const createFolder = async (req: Request, res: Response): Promise<void> =
       parentId: parentId || null,
       path,
       createdBy: req.user.userId,
+      organizationId: req.user.organizationId ?? undefined,
     });
 
     res.status(201).json({
@@ -62,6 +63,10 @@ export const getFolders = async (req: Request, res: Response): Promise<void> => 
     const whereClause: any = {};
     if (parentId !== undefined) {
       whereClause.parentId = parentId === 'null' ? null : parentId;
+    }
+    // Org scoping: non-admin users only see their org's folders; admins see all
+    if (req.user.organizationId && req.user.role !== 'admin') {
+      whereClause.organizationId = req.user.organizationId;
     }
 
     const folders = await Folder.findAll({
@@ -245,9 +250,13 @@ export const getFolderTree = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Get all root folders (folders without parent)
+    // Get all root folders (folders without parent) — scoped by org for non-admins
+    const treeWhere: any = { parentId: null };
+    if (req.user.organizationId && req.user.role !== 'admin') {
+      treeWhere.organizationId = req.user.organizationId;
+    }
     const rootFolders = await Folder.findAll({
-      where: { parentId: null } as any,
+      where: treeWhere,
       include: [
         {
           model: Folder,

@@ -23,9 +23,10 @@ export const getGovDocuments = async (req: Request, res: Response): Promise<void
       metadata: { [Op.ne]: null },
     };
 
-    // Regular users only see their own gov docs
-    if (role === 'user') {
-      where.uploadedBy = userId;
+    // Non-admin users only see their organization's gov docs; admins see all
+    const orgId = (req.user as any).organizationId;
+    if (orgId && role !== 'admin') {
+      where.organizationId = orgId;
     }
 
     const docs = await Document.findAll({
@@ -133,10 +134,16 @@ export const clearGovMetadata = async (req: Request, res: Response): Promise<voi
 };
 
 // ── Stats: classification breakdown ──
-export const getGovStats = async (_req: Request, res: Response): Promise<void> => {
+export const getGovStats = async (req: Request, res: Response): Promise<void> => {
   try {
+    const statsWhere: any = { isDeleted: false, metadata: { [Op.ne]: null } };
+    const orgId = (req.user as any)?.organizationId;
+    const role = (req.user as any)?.role;
+    if (orgId && role !== 'admin') {
+      statsWhere.organizationId = orgId;
+    }
     const docs = await Document.findAll({
-      where: { isDeleted: false, metadata: { [Op.ne]: null } },
+      where: statsWhere,
       attributes: ['metadata'],
     });
 

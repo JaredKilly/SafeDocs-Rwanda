@@ -20,16 +20,71 @@ import {
   Autocomplete,
   Chip,
   CircularProgress,
+  Divider,
+  Stack,
+  alpha,
 } from '@mui/material';
 import {
   CloudUpload as UploadIcon,
   Add as AddIcon,
+  AccountBalance as GovIcon,
+  LocalHospital as HealthIcon,
+  Business as HRIcon,
 } from '@mui/icons-material';
 import { uploadDocument, createFolder } from '../store/documentsSlice';
 import { AppDispatch, RootState } from '../store';
-import { Tag } from '../types';
+import {
+  Tag,
+  HRCategory,
+  HR_CATEGORY_LABELS,
+  HCRecordType,
+  HCPrivacyLevel,
+  HC_RECORD_LABELS,
+  HC_PRIVACY_LABELS,
+  HCMeta,
+} from '../types';
 import apiService from '../services/api';
 import { PDFDocument } from 'pdf-lib';
+
+// ── Government classification types ──
+type ClassificationLevel = 'public' | 'internal' | 'restricted' | 'confidential' | 'top_secret';
+
+const CLASSIFICATION_OPTIONS: { value: ClassificationLevel; label: string }[] = [
+  { value: 'public', label: 'Public' },
+  { value: 'internal', label: 'Internal' },
+  { value: 'restricted', label: 'Restricted' },
+  { value: 'confidential', label: 'Confidential' },
+  { value: 'top_secret', label: 'Top Secret' },
+];
+
+const GOV_RETENTION_OPTIONS = [
+  { value: 1, label: '1 year' }, { value: 3, label: '3 years' },
+  { value: 5, label: '5 years' }, { value: 7, label: '7 years' },
+  { value: 10, label: '10 years' }, { value: 15, label: '15 years' },
+  { value: 20, label: '20 years' }, { value: 0, label: 'Permanent' },
+];
+
+const HC_RETENTION_OPTIONS = [
+  { value: 5, label: '5 years' }, { value: 7, label: '7 years' },
+  { value: 10, label: '10 years' }, { value: 15, label: '15 years' },
+  { value: 25, label: '25 years' }, { value: 0, label: 'Permanent' },
+];
+
+type ModuleType = 'none' | 'government' | 'healthcare' | 'hr';
+
+interface GovForm {
+  classification?: ClassificationLevel;
+  govRef?: string;
+  subject?: string;
+  issuingAuthority?: string;
+  retentionYears?: number;
+}
+
+interface HrForm {
+  hrOrganization?: string;
+  hrDepartment?: string;
+  hrCategory?: HRCategory;
+}
 
 interface Props {
   open: boolean;
@@ -56,6 +111,13 @@ const UploadDocumentModal: React.FC<Props> = ({ open, onClose }) => {
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [tagsLoading, setTagsLoading] = useState(false);
+
+  // Module assignment
+  const [moduleType, setModuleType] = useState<ModuleType>('none');
+  const [govForm, setGovForm] = useState<GovForm>({});
+  const [hcForm, setHcForm] = useState<HCMeta>({});
+  const [hrForm, setHrForm] = useState<HrForm>({});
+  const [moduleError, setModuleError] = useState<string | null>(null);
 
   // Load tags when dialog opens
   useEffect(() => {
@@ -123,9 +185,39 @@ const UploadDocumentModal: React.FC<Props> = ({ open, onClose }) => {
       formData.append('tags', JSON.stringify(selectedTags.map((t) => t.id)));
     }
 
+    let hadModuleError = false;
     try {
-      await dispatch(uploadDocument(formData)).unwrap();
-      handleClose();
+      setModuleError(null);
+      const result = await dispatch(uploadDocument(formData)).unwrap();
+      const docId = (result as any)?.document?.id;
+
+      // Apply module metadata after upload
+      if (docId && moduleType === 'government' && govForm.classification) {
+        try {
+          await apiService.setGovMetadata(docId, govForm);
+        } catch {
+          setModuleError('Document uploaded but failed to set government classification. You can set it from the Government page.');
+          hadModuleError = true;
+        }
+      } else if (docId && moduleType === 'healthcare' && hcForm.hcRecordType) {
+        try {
+          await apiService.setHealthcareMetadata(docId, hcForm);
+        } catch {
+          setModuleError('Document uploaded but failed to set healthcare metadata. You can set it from the Healthcare page.');
+          hadModuleError = true;
+        }
+      } else if (docId && moduleType === 'hr' && hrForm.hrOrganization) {
+        try {
+          await apiService.setHRDocMetadata(docId, hrForm);
+        } catch {
+          setModuleError('Document uploaded but failed to set HR classification. You can set it from the HR page.');
+          hadModuleError = true;
+        }
+      }
+
+      if (!hadModuleError) {
+        handleClose();
+      }
     } catch (error) {
       console.error('Upload failed:', error);
     }
@@ -141,6 +233,11 @@ const UploadDocumentModal: React.FC<Props> = ({ open, onClose }) => {
     setSelectedTags([]);
     setEnableExpiry(false);
     setExpiresAt('');
+    setModuleType('none');
+    setGovForm({});
+    setHcForm({});
+    setHrForm({});
+    setModuleError(null);
     onClose();
   };
 
@@ -196,6 +293,7 @@ const UploadDocumentModal: React.FC<Props> = ({ open, onClose }) => {
       <DialogContent>
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          {moduleError && <Alert severity="warning" sx={{ mb: 2 }} onClose={() => { setModuleError(null); handleClose(); }}>{moduleError}</Alert>}
 
           {/* Drag & Drop Zone */}
           <Box
@@ -377,6 +475,240 @@ const UploadDocumentModal: React.FC<Props> = ({ open, onClose }) => {
               }}
               sx={{ mt: 1.5, mb: 1 }}
             />
+          )}
+
+          {/* ── Module Assignment ── */}
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+            Assign to Module (Optional)
+          </Typography>
+
+          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+            <InputLabel>Module</InputLabel>
+            <Select
+              label="Module"
+              value={moduleType}
+              onChange={(e) => {
+                setModuleType(e.target.value as ModuleType);
+                setGovForm({});
+                setHcForm({});
+                setHrForm({});
+              }}
+            >
+              <MenuItem value="none"><em>None</em></MenuItem>
+              <MenuItem value="government">
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <GovIcon fontSize="small" sx={{ color: '#1565C0' }} />
+                  <span>Government Classification</span>
+                </Stack>
+              </MenuItem>
+              <MenuItem value="healthcare">
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <HealthIcon fontSize="small" sx={{ color: '#2E7D32' }} />
+                  <span>Healthcare Record</span>
+                </Stack>
+              </MenuItem>
+              <MenuItem value="hr">
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <HRIcon fontSize="small" sx={{ color: '#E65100' }} />
+                  <span>HR / Organization</span>
+                </Stack>
+              </MenuItem>
+            </Select>
+          </FormControl>
+
+          {/* Government fields */}
+          {moduleType === 'government' && (
+            <Box sx={{ p: 2, borderRadius: 2, bgcolor: alpha('#1565C0', 0.04), border: '1px solid', borderColor: alpha('#1565C0', 0.15), mb: 1 }}>
+              <Stack spacing={2}>
+                <FormControl size="small" fullWidth required>
+                  <InputLabel>Classification Level *</InputLabel>
+                  <Select
+                    label="Classification Level *"
+                    value={govForm.classification || ''}
+                    onChange={(e) => setGovForm(f => ({ ...f, classification: e.target.value as ClassificationLevel }))}
+                  >
+                    {CLASSIFICATION_OPTIONS.map(o => (
+                      <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                  <TextField
+                    label="Reference Number"
+                    placeholder="e.g. GOV/RW/2026/001"
+                    size="small"
+                    fullWidth
+                    value={govForm.govRef || ''}
+                    onChange={(e) => setGovForm(f => ({ ...f, govRef: e.target.value }))}
+                  />
+                  <TextField
+                    label="Issuing Authority"
+                    placeholder="e.g. Ministry of Finance"
+                    size="small"
+                    fullWidth
+                    value={govForm.issuingAuthority || ''}
+                    onChange={(e) => setGovForm(f => ({ ...f, issuingAuthority: e.target.value }))}
+                  />
+                </Stack>
+                <TextField
+                  label="Subject"
+                  placeholder="Brief subject of the document"
+                  size="small"
+                  fullWidth
+                  value={govForm.subject || ''}
+                  onChange={(e) => setGovForm(f => ({ ...f, subject: e.target.value }))}
+                />
+                <FormControl size="small" fullWidth>
+                  <InputLabel>Retention Period</InputLabel>
+                  <Select
+                    label="Retention Period"
+                    value={govForm.retentionYears ?? ''}
+                    onChange={(e) => setGovForm(f => ({ ...f, retentionYears: e.target.value as number }))}
+                  >
+                    <MenuItem value=""><em>Not set</em></MenuItem>
+                    {GOV_RETENTION_OPTIONS.map(o => (
+                      <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Stack>
+            </Box>
+          )}
+
+          {/* Healthcare fields */}
+          {moduleType === 'healthcare' && (
+            <Box sx={{ p: 2, borderRadius: 2, bgcolor: alpha('#2E7D32', 0.04), border: '1px solid', borderColor: alpha('#2E7D32', 0.15), mb: 1 }}>
+              <Stack spacing={2}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                  <FormControl size="small" fullWidth required>
+                    <InputLabel>Record Type *</InputLabel>
+                    <Select
+                      label="Record Type *"
+                      value={hcForm.hcRecordType || ''}
+                      onChange={(e) => setHcForm(f => ({ ...f, hcRecordType: e.target.value as HCRecordType }))}
+                    >
+                      {(Object.keys(HC_RECORD_LABELS) as HCRecordType[]).map(k => (
+                        <MenuItem key={k} value={k}>{HC_RECORD_LABELS[k]}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControl size="small" fullWidth>
+                    <InputLabel>Privacy Level</InputLabel>
+                    <Select
+                      label="Privacy Level"
+                      value={hcForm.hcPrivacyLevel || ''}
+                      onChange={(e) => setHcForm(f => ({ ...f, hcPrivacyLevel: e.target.value as HCPrivacyLevel }))}
+                    >
+                      <MenuItem value=""><em>Not set</em></MenuItem>
+                      {(Object.keys(HC_PRIVACY_LABELS) as HCPrivacyLevel[]).map(k => (
+                        <MenuItem key={k} value={k}>{HC_PRIVACY_LABELS[k]}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Stack>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                  <TextField
+                    label="Patient ID"
+                    placeholder="e.g. PT-00123"
+                    size="small"
+                    fullWidth
+                    value={hcForm.hcPatientId || ''}
+                    onChange={(e) => setHcForm(f => ({ ...f, hcPatientId: e.target.value }))}
+                  />
+                  <TextField
+                    label="Patient Name"
+                    size="small"
+                    fullWidth
+                    value={hcForm.hcPatientName || ''}
+                    onChange={(e) => setHcForm(f => ({ ...f, hcPatientName: e.target.value }))}
+                  />
+                </Stack>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                  <TextField
+                    label="Facility"
+                    placeholder="e.g. King Faisal Hospital"
+                    size="small"
+                    fullWidth
+                    value={hcForm.hcFacility || ''}
+                    onChange={(e) => setHcForm(f => ({ ...f, hcFacility: e.target.value }))}
+                  />
+                  <TextField
+                    label="Provider"
+                    placeholder="Doctor / nurse name"
+                    size="small"
+                    fullWidth
+                    value={hcForm.hcProvider || ''}
+                    onChange={(e) => setHcForm(f => ({ ...f, hcProvider: e.target.value }))}
+                  />
+                </Stack>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center">
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={hcForm.hcConsentObtained || false}
+                        onChange={(e) => setHcForm(f => ({ ...f, hcConsentObtained: e.target.checked }))}
+                        size="small"
+                      />
+                    }
+                    label="Patient consent obtained"
+                  />
+                  <FormControl size="small" sx={{ minWidth: 140 }}>
+                    <InputLabel>Retention</InputLabel>
+                    <Select
+                      label="Retention"
+                      value={hcForm.hcRetentionYears ?? ''}
+                      onChange={(e) => setHcForm(f => ({ ...f, hcRetentionYears: e.target.value as number }))}
+                    >
+                      <MenuItem value=""><em>Not set</em></MenuItem>
+                      {HC_RETENTION_OPTIONS.map(o => (
+                        <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Stack>
+              </Stack>
+            </Box>
+          )}
+
+          {/* HR / Organization fields */}
+          {moduleType === 'hr' && (
+            <Box sx={{ p: 2, borderRadius: 2, bgcolor: alpha('#E65100', 0.04), border: '1px solid', borderColor: alpha('#E65100', 0.15), mb: 1 }}>
+              <Stack spacing={2}>
+                <TextField
+                  label="Organization *"
+                  placeholder="e.g. Bobaat Technologies"
+                  size="small"
+                  fullWidth
+                  required
+                  value={hrForm.hrOrganization || ''}
+                  onChange={(e) => setHrForm(f => ({ ...f, hrOrganization: e.target.value }))}
+                />
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                  <TextField
+                    label="Department"
+                    placeholder="e.g. Human Resources"
+                    size="small"
+                    fullWidth
+                    value={hrForm.hrDepartment || ''}
+                    onChange={(e) => setHrForm(f => ({ ...f, hrDepartment: e.target.value }))}
+                  />
+                  <FormControl size="small" fullWidth>
+                    <InputLabel>Category</InputLabel>
+                    <Select
+                      label="Category"
+                      value={hrForm.hrCategory || ''}
+                      onChange={(e) => setHrForm(f => ({ ...f, hrCategory: e.target.value as HRCategory }))}
+                    >
+                      <MenuItem value=""><em>Not set</em></MenuItem>
+                      {(Object.keys(HR_CATEGORY_LABELS) as HRCategory[]).map(k => (
+                        <MenuItem key={k} value={k}>{HR_CATEGORY_LABELS[k]}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Stack>
+              </Stack>
+            </Box>
           )}
 
           {folderError && <Alert severity="error" sx={{ mt: 1 }}>{folderError}</Alert>}

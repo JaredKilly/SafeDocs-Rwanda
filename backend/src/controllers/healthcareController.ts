@@ -24,9 +24,10 @@ export const getHealthcareDocs = async (req: Request, res: Response): Promise<vo
 
     const where: any = { isDeleted: false, metadata: { [Op.ne]: null } };
 
-    // Non-admin/manager users only see their own documents
-    if (role === 'user') {
-      where.uploadedBy = userId;
+    // Non-admin users only see their organization's documents; admins see all
+    const orgId = (req.user as any).organizationId;
+    if (orgId && role !== 'admin') {
+      where.organizationId = orgId;
     }
 
     const docs = await Document.findAll({ where, order: [['createdAt', 'DESC']], limit: 500 });
@@ -150,10 +151,16 @@ export const clearHealthcareMetadata = async (req: Request, res: Response): Prom
 };
 
 // ── Stats ──
-export const getHealthcareStats = async (_req: Request, res: Response): Promise<void> => {
+export const getHealthcareStats = async (req: Request, res: Response): Promise<void> => {
   try {
+    const hcStatsWhere: any = { isDeleted: false, metadata: { [Op.ne]: null } };
+    const orgId = (req.user as any)?.organizationId;
+    const role = (req.user as any)?.role;
+    if (orgId && role !== 'admin') {
+      hcStatsWhere.organizationId = orgId;
+    }
     const docs = await Document.findAll({
-      where: { isDeleted: false, metadata: { [Op.ne]: null } },
+      where: hcStatsWhere,
       attributes: ['metadata'],
     });
 
