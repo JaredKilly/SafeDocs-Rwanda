@@ -31,37 +31,41 @@ dotenv.config();
 const app: Application = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
 app.use(helmet());
 
-// CORS: support comma-separated origins in CORS_ORIGIN env var
-// Also allows all *.netlify.app and *.up.railway.app origins automatically
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
-  .split(',')
-  .map(o => o.trim())
-  .filter(Boolean);
-
-const isAllowedOrigin = (origin: string): boolean => {
-  if (allowedOrigins.includes(origin)) return true;
-  try {
-    const { hostname } = new URL(origin);
-    return hostname.endsWith('.netlify.app') || hostname.endsWith('.up.railway.app');
-  } catch {
-    return false;
-  }
-};
-
-app.use(cors({
+// CORS must be registered BEFORE the rate limiter so that OPTIONS preflight
+// requests are never blocked before CORS headers can be set.
+const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, server-to-server)
-    if (!origin) return callback(null, true);
-    if (isAllowedOrigin(origin)) return callback(null, true);
+    if (!origin) return callback(null, true); // server-to-server / curl
+
+    // Allow explicit origins from CORS_ORIGIN env var (comma-separated)
+    const explicit = (process.env.CORS_ORIGIN || '')
+      .split(',')
+      .map(o => o.trim())
+      .filter(Boolean);
+    if (explicit.includes(origin)) return callback(null, true);
+
+    // Wildcard: allow any *.netlify.app or *.up.railway.app
+    try {
+      const { hostname } = new URL(origin);
+      if (
+        hostname.endsWith('.netlify.app') ||
+        hostname.endsWith('.up.railway.app')
+      ) {
+        return callback(null, true);
+      }
+    } catch {}
+
     callback(new Error(`Origin ${origin} not allowed by CORS`));
   },
   credentials: true,
-}));
+};
 
-// Trust proxy in production (Render, Railway, Heroku, etc.)
+app.options('*', cors(corsOptions)); // handle preflight across all routes
+app.use(cors(corsOptions));
+
+// Trust proxy in production (Railway, Render, Heroku)
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
@@ -71,21 +75,11 @@ app.use(generalLimiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
-app.get('/', (req: Request, res: Response) => {
-  res.json({
-    message: 'Welcome to SafeDocs Rwanda API',
-    version: '1.0.0',
-    endpoints: {
-      auth: '/api/auth',
-      documents: '/api/documents',
-      folders: '/api/folders',
-      users: '/api/users',
-    },
-  });
+// --- Routes ---
+app.get('/', (_req: Request, res: Response) => {
+  res.json({ message: 'Welcome to SafeDocs Rwanda API', version: '1.0.0' });
 });
 
-// Health check
 app.get('/api/health', async (_req: Request, res: Response) => {
   const started = Date.now();
   try {
@@ -97,8 +91,7 @@ app.get('/api/health', async (_req: Request, res: Response) => {
       responseTimeMs: Date.now() - started,
       timestamp: new Date().toISOString(),
     });
-  } catch (error) {
-    console.error('Health check failed:', error);
+  } catch {
     res.status(503).json({
       status: 'error',
       database: 'unavailable',
@@ -128,38 +121,24 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 
 // 404 handler
-app.use((req: Request, res: Response) => {
+app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
 // Error handler
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error('Error:', err);
-  
-  if (err.name === 'MulterError') {
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      res.status(400).json({ error: 'File size exceeds limit' });
-      return;
-    }
-    res.status(400).json({ error: err.message });
-    return;
-  }
-
   res.status(err.status || 500).json({
     error: err.message || 'Internal server error',
   });
 });
 
-// Initialize database and start server
+// --- Start Server ---
 const startServer = async () => {
   try {
-    // Test database connection
     await testConnection();
-    
-    // Sync database models — creates missing tables, never drops existing ones
-    await syncDatabase(false); // force: false — safe in production
-    
-    // Initialize MinIO if enabled
+    await syncDatabase(false);
+
     if (process.env.USE_MINIO === 'true') {
       console.log('🗄️  Initializing MinIO storage...');
       await initializeBucket();
@@ -167,11 +146,10 @@ const startServer = async () => {
     } else {
       console.log('📁 Using local file storage');
     }
-    
+
     app.listen(PORT, () => {
-      console.log(`🚀 Server is running on port ${PORT}`);
+      console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📚 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🔗 API URL: http://localhost:${PORT}`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

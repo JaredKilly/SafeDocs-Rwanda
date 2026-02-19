@@ -12,7 +12,7 @@ const sslOptions = isProduction && !isInternalRailway
   ? { ssl: { require: true, rejectUnauthorized: false } }
   : {};
 
-// Support DATABASE_URL (used by Render, Railway, Heroku, Supabase, etc.)
+// Support DATABASE_URL (Railway, Render, Heroku, Supabase) with fallback to individual vars
 const sequelize = dbUrl
   ? new Sequelize(dbUrl, {
       dialect: 'postgres',
