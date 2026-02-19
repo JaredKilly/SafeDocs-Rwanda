@@ -1,3 +1,15 @@
+// Organization Types
+export interface Organization {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  userCount?: number;
+}
+
 // User Types
 export interface User {
   id: number;
@@ -6,6 +18,9 @@ export interface User {
   fullName: string;
   role: 'admin' | 'manager' | 'user';
   isActive: boolean;
+  organizationId?: number | null;
+  organizationName?: string;
+  organization?: Organization;
   createdAt: string;
   updatedAt: string;
 }
@@ -193,6 +208,53 @@ export interface HealthcareStats {
   noConsent: number;
 }
 
+// ── Media Types ─────────────────────────────────────────────
+
+export type MediaType = 'image' | 'video';
+
+export type MediaCategory = 'general' | 'marketing' | 'training' | 'event' | 'documentation' | 'other';
+
+export const MEDIA_CATEGORY_LABELS: Record<MediaCategory, string> = {
+  general: 'General',
+  marketing: 'Marketing',
+  training: 'Training',
+  event: 'Event',
+  documentation: 'Documentation',
+  other: 'Other',
+};
+
+export interface MediaItem {
+  id: number;
+  title: string;
+  description?: string;
+  fileName: string;
+  filePath: string;
+  fileSize: number;
+  mimeType: string;
+  mediaType: MediaType;
+  storageType: 'local' | 'minio';
+  thumbnailPath?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+  category: MediaCategory;
+  tags: string[];
+  uploadedBy: number;
+  isDeleted: boolean;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+  uploader?: User;
+}
+
+export interface MediaStats {
+  total: number;
+  images: number;
+  videos: number;
+  totalStorageBytes: number;
+  categories: { category: string; count: number }[];
+}
+
 // Folder Types
 export interface Folder {
   id: number;
@@ -337,4 +399,122 @@ export interface AccessRequest {
   document?: Document;
   requester?: User;
   reviewer?: User;
+}
+
+// ── Notification Types ───────────────────────────────────────
+
+export type NotificationType =
+  | 'document_shared'
+  | 'access_request_submitted'
+  | 'access_request_approved'
+  | 'access_request_denied'
+  | 'document_review_submitted'
+  | 'document_review_approved'
+  | 'document_review_rejected';
+
+export interface AppNotification {
+  id: number;
+  recipientId: number;
+  type: NotificationType;
+  title: string;
+  message?: string;
+  isRead: boolean;
+  relatedId?: number;
+  relatedType?: 'document' | 'access_request' | 'share';
+  actorId?: number;
+  actor?: Pick<User, 'id' | 'username' | 'fullName'>;
+  createdAt: string;
+}
+
+// ── Analytics Types ──────────────────────────────────────────
+
+export type AnalyticsRange = '7d' | '30d' | '90d' | 'all';
+
+export interface AnalyticsOverview {
+  totalDocuments: number;
+  totalUsers: number;
+  totalStorageBytes: number;
+  totalOrganizations: number;
+  totalFolders: number;
+}
+
+export interface TimeSeriesPoint {
+  date: string;
+  count: number;
+}
+
+export interface MimeTypeBreakdown {
+  mimeType: string;
+  count: number;
+}
+
+export interface ModuleBreakdown {
+  module: string;
+  count: number;
+}
+
+export interface DocumentAnalytics {
+  documentsOverTime: TimeSeriesPoint[];
+  byMimeType: MimeTypeBreakdown[];
+  byModule: ModuleBreakdown[];
+}
+
+export interface TopUploader {
+  userId: number;
+  username: string;
+  fullName: string;
+  count: number;
+  totalSize: number;
+}
+
+export interface RecentActivityItem {
+  id: number;
+  action: string;
+  userId?: number;
+  user?: Pick<User, 'id' | 'username' | 'fullName'>;
+  createdAt: string;
+}
+
+export interface UserActivityAnalytics {
+  activeUsers: number;
+  totalUsers: number;
+  newUsersOverTime: TimeSeriesPoint[];
+  topUploaders: TopUploader[];
+  recentActivity: RecentActivityItem[];
+}
+
+export interface StorageByUser {
+  userId: number;
+  fullName: string;
+  totalSize: number;
+  count: number;
+}
+
+export interface StorageByOrg {
+  organizationId: number | null;
+  organizationName: string;
+  totalSize: number;
+  count: number;
+}
+
+export interface StorageGrowthPoint {
+  date: string;
+  bytes: number;
+}
+
+export interface StorageAnalytics {
+  storageByUser: StorageByUser[];
+  storageGrowth: StorageGrowthPoint[];
+  storageByOrg: StorageByOrg[];
+}
+
+export interface AuditActionBreakdown {
+  action: string;
+  count: number;
+}
+
+export interface AuditAnalytics {
+  totalActions: number;
+  actionsOverTime: TimeSeriesPoint[];
+  topActions: AuditActionBreakdown[];
 }

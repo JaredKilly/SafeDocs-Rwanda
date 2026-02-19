@@ -17,6 +17,16 @@ import {
   Group,
   GroupMemberDetails,
   AccessRequest,
+  MediaItem,
+  MediaStats,
+  Organization,
+  AnalyticsOverview,
+  DocumentAnalytics,
+  UserActivityAnalytics,
+  StorageAnalytics,
+  AuditAnalytics,
+  AnalyticsRange,
+  AppNotification,
 } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -415,6 +425,20 @@ class ApiService {
     await this.api.delete(`/hr/${employeeId}/documents/${documentId}`);
   }
 
+  // HR document classification (by organization)
+  async getHRDocs(params?: { q?: string; organization?: string; hrCategory?: string }): Promise<import('../types').Document[]> {
+    const r = await this.api.get('/hr/documents/classified', { params });
+    return r.data;
+  }
+
+  async setHRDocMetadata(documentId: number, data: { hrOrganization?: string; hrDepartment?: string; hrCategory?: string }): Promise<void> {
+    await this.api.put(`/hr/documents/${documentId}/metadata`, data);
+  }
+
+  async clearHRDocMetadata(documentId: number): Promise<void> {
+    await this.api.delete(`/hr/documents/${documentId}/metadata`);
+  }
+
   async updateProfile(data: { fullName?: string; email?: string }): Promise<User> {
     const response = await this.api.put<{ message: string; user: User }>('/auth/profile', data);
     return response.data.user;
@@ -436,8 +460,8 @@ class ApiService {
     return response.data;
   }
 
-  async updateUserRole(userId: number, role: 'admin' | 'manager' | 'user'): Promise<User> {
-    const response = await this.api.put<User>(`/users/${userId}/role`, { role });
+  async updateUserRole(userId: number, role: 'admin' | 'manager' | 'user', organizationId?: number | null): Promise<User> {
+    const response = await this.api.put<User>(`/users/${userId}/role`, { role, organizationId });
     return response.data;
   }
 
@@ -456,9 +480,35 @@ class ApiService {
     password: string;
     fullName?: string;
     role?: 'admin' | 'manager' | 'user';
+    organizationId?: number | null;
   }): Promise<User> {
     const response = await this.api.post<{ user: User }>('/users', data);
     return response.data.user;
+  }
+
+  // ── Organizations (admin only) ──────────────────────────────
+  async getOrganizations(): Promise<Organization[]> {
+    const response = await this.api.get<Organization[]>('/organizations');
+    return response.data;
+  }
+
+  async getOrganization(id: number): Promise<Organization & { users?: User[] }> {
+    const response = await this.api.get(`/organizations/${id}`);
+    return response.data;
+  }
+
+  async createOrganization(data: { name: string; slug: string; description?: string }): Promise<Organization> {
+    const response = await this.api.post<{ organization: Organization }>('/organizations', data);
+    return response.data.organization;
+  }
+
+  async updateOrganization(id: number, data: Partial<{ name: string; slug: string; description: string; isActive: boolean }>): Promise<Organization> {
+    const response = await this.api.put<{ organization: Organization }>(`/organizations/${id}`, data);
+    return response.data.organization;
+  }
+
+  async deleteOrganization(id: number): Promise<void> {
+    await this.api.delete(`/organizations/${id}`);
   }
 
   // Document Versions
@@ -553,6 +603,102 @@ class ApiService {
     const response = await this.api.get('/audit-logs', { params });
     return response.data;
   }
+
+  // ── Media Library ─────────────────────────────────────────────
+  async getMediaStats(): Promise<MediaStats> {
+    const r = await this.api.get('/media/stats');
+    return r.data;
+  }
+
+  async getMediaItems(params?: { q?: string; mediaType?: string; category?: string }): Promise<MediaItem[]> {
+    const r = await this.api.get('/media', { params });
+    return r.data;
+  }
+
+  async getMediaItem(id: number): Promise<MediaItem> {
+    const r = await this.api.get(`/media/${id}`);
+    return r.data;
+  }
+
+  async uploadMedia(formData: FormData): Promise<MediaItem> {
+    const r = await this.api.post('/media', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return r.data;
+  }
+
+  async updateMedia(id: number, data: Partial<MediaItem>): Promise<MediaItem> {
+    const r = await this.api.put(`/media/${id}`, data);
+    return r.data;
+  }
+
+  async deleteMedia(id: number): Promise<void> {
+    await this.api.delete(`/media/${id}`);
+  }
+
+  getMediaStreamUrl(id: number): string {
+    return `${API_URL}/media/${id}/stream`;
+  }
+
+  getMediaDownloadUrl(id: number): string {
+    return `${API_URL}/media/${id}/download`;
+  }
+
+  // ── Analytics ─────────────────────────────────────────────
+
+  async getAnalyticsOverview(range?: AnalyticsRange): Promise<AnalyticsOverview> {
+    const r = await this.api.get('/analytics/overview', { params: { range } });
+    return r.data;
+  }
+
+  async getDocumentAnalytics(range?: AnalyticsRange): Promise<DocumentAnalytics> {
+    const r = await this.api.get('/analytics/documents', { params: { range } });
+    return r.data;
+  }
+
+  async getUserActivityAnalytics(range?: AnalyticsRange): Promise<UserActivityAnalytics> {
+    const r = await this.api.get('/analytics/users', { params: { range } });
+    return r.data;
+  }
+
+  async getStorageAnalytics(range?: AnalyticsRange): Promise<StorageAnalytics> {
+    const r = await this.api.get('/analytics/storage', { params: { range } });
+    return r.data;
+  }
+
+  async getAuditAnalytics(range?: AnalyticsRange): Promise<AuditAnalytics> {
+    const r = await this.api.get('/analytics/audit', { params: { range } });
+    return r.data;
+  }
+
+  // ── Notifications ─────────────────────────────────────────
+
+  async getNotifications(page = 1, limit = 20): Promise<{ notifications: AppNotification[]; total: number }> {
+    const r = await this.api.get('/notifications', { params: { page, limit } });
+    return r.data;
+  }
+
+  async getUnreadNotificationCount(): Promise<number> {
+    const r = await this.api.get<{ count: number }>('/notifications/unread-count');
+    return r.data.count;
+  }
+
+  async markNotificationRead(id: number): Promise<void> {
+    await this.api.patch(`/notifications/${id}/read`);
+  }
+
+  async markAllNotificationsRead(): Promise<void> {
+    await this.api.patch('/notifications/read-all');
+  }
+
+  async joinWaitlist(email: string, name?: string): Promise<{ message: string; email: string }> {
+    const response = await this.api.post<{ message: string; email: string }>('/waitlist', {
+      email: email.trim(),
+      name: name?.trim() || undefined,
+    });
+    return response.data;
+  }
 }
 
-export default new ApiService();
+const apiService = new ApiService();
+export default apiService;

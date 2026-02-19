@@ -5,6 +5,7 @@ import { AccessLevel, PermissionType } from '../services/permissionService';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { sendShareNotification, sendShareLink } from '../services/emailService';
+import { createNotification, NotificationType } from '../services/notificationService';
 
 /**
  * Share document with user, group, or role
@@ -74,6 +75,19 @@ export const shareDocument = async (req: Request, res: Response): Promise<void> 
       ipAddress: req.ip,
       userAgent: req.get('user-agent')
     });
+
+    // In-app notification for shared user
+    if (targetType === 'user') {
+      await createNotification({
+        recipientId: parseInt(targetId),
+        type: NotificationType.DOCUMENT_SHARED,
+        title: `Document shared with you: ${document.title}`,
+        message: `You have been granted ${accessLevel} access`,
+        relatedId: parseInt(documentId),
+        relatedType: 'document',
+        actorId: req.user.userId,
+      });
+    }
 
     // Send email notification if sharing with a specific user
     if (targetType === 'user') {

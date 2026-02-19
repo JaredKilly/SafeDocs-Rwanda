@@ -7,11 +7,12 @@ interface FolderAttributes {
   parentId?: number;
   path?: string;
   createdBy: number;
+  organizationId?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-interface FolderCreationAttributes extends Optional<FolderAttributes, 'id' | 'parentId' | 'path'> {}
+interface FolderCreationAttributes extends Optional<FolderAttributes, 'id' | 'parentId' | 'path' | 'organizationId'> {}
 
 class Folder extends Model<FolderAttributes, FolderCreationAttributes> implements FolderAttributes {
   public id!: number;
@@ -19,6 +20,7 @@ class Folder extends Model<FolderAttributes, FolderCreationAttributes> implement
   public parentId?: number;
   public path?: string;
   public createdBy!: number;
+  public organizationId?: number;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -54,6 +56,14 @@ Folder.init(
       allowNull: false,
       references: {
         model: 'users',
+        key: 'id',
+      },
+    },
+    organizationId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'organizations',
         key: 'id',
       },
     },

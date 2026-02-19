@@ -39,6 +39,8 @@ import {
   Badge as HRIcon,
   AccountBalance as GovIcon,
   LocalHospital as HealthcareIcon,
+  PermMedia as MediaLibraryIcon,
+  Assessment as AnalyticsIcon,
 } from '@mui/icons-material';
 import { logout } from '../store/authSlice';
 import { AppDispatch, RootState } from '../store';
@@ -86,6 +88,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { label: 'Healthcare', icon: <HealthcareIcon />, path: '/healthcare' },
     ...(user?.role === 'admin' || user?.role === 'manager'
       ? [{ label: 'HR Documents', icon: <HRIcon />, path: '/hr' }]
+      : []),
+    ...(user?.role === 'admin' || user?.role === 'manager'
+      ? [{ label: 'Media Library', icon: <MediaLibraryIcon />, path: '/media' }]
+      : []),
+    ...(user?.role === 'admin' || user?.role === 'manager'
+      ? [{ label: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' }]
       : []),
     ...(user?.role === 'admin'
       ? [{ label: 'Admin Panel', icon: <AdminIcon />, path: '/admin' }]
@@ -273,7 +281,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 {user?.fullName || user?.username}
               </Typography>
               <Typography variant="caption" color="text.secondary" noWrap>
-                {user?.role}
+                {user?.organizationName || user?.role}
               </Typography>
             </Box>
           )}

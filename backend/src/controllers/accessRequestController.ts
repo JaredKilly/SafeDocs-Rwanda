@@ -3,6 +3,7 @@ import { AccessRequest, Document, User, AuditLog } from '../models';
 import { grantDocumentAccess, checkDocumentPermission } from '../services/permissionService';
 import { AccessLevel, PermissionType } from '../services/permissionService';
 import { sendAccessRequestNotification, sendAccessRequestResponse } from '../services/emailService';
+import { createNotification, NotificationType } from '../services/notificationService';
 
 /**
  * Submit an access request for a document
@@ -79,7 +80,18 @@ export const submitAccessRequest = async (req: Request, res: Response): Promise<
       userAgent: req.get('user-agent')
     });
 
-    // Notify document owner
+    // In-app notification for document owner
+    await createNotification({
+      recipientId: document.uploadedBy,
+      type: NotificationType.ACCESS_REQUEST_SUBMITTED,
+      title: `Access request for: ${document.title}`,
+      message: message || `${requestedAccess} access requested`,
+      relatedId: accessRequest.id,
+      relatedType: 'access_request',
+      actorId: req.user.userId,
+    });
+
+    // Notify document owner via email
     try {
       const owner = await User.findByPk(document.uploadedBy);
       const requester = await User.findByPk(req.user.userId);
@@ -259,7 +271,18 @@ export const approveRequest = async (req: Request, res: Response): Promise<void>
       userAgent: req.get('user-agent')
     });
 
-    // Notify requester of approval
+    // In-app notification for requester
+    await createNotification({
+      recipientId: accessRequest.requesterId,
+      type: NotificationType.ACCESS_REQUEST_APPROVED,
+      title: 'Access request approved',
+      message: response || `You now have ${accessLevel} access`,
+      relatedId: accessRequest.documentId,
+      relatedType: 'document',
+      actorId: req.user.userId,
+    });
+
+    // Notify requester of approval via email
     try {
       const requester = await User.findByPk(accessRequest.requesterId);
       const doc = await Document.findByPk(accessRequest.documentId, { attributes: ['title'] });
@@ -342,7 +365,18 @@ export const denyRequest = async (req: Request, res: Response): Promise<void> =>
       userAgent: req.get('user-agent')
     });
 
-    // Notify requester of denial
+    // In-app notification for requester
+    await createNotification({
+      recipientId: accessRequest.requesterId,
+      type: NotificationType.ACCESS_REQUEST_DENIED,
+      title: 'Access request denied',
+      message: response || 'Your access request was denied',
+      relatedId: accessRequest.documentId,
+      relatedType: 'document',
+      actorId: req.user.userId,
+    });
+
+    // Notify requester of denial via email
     try {
       const requester = await User.findByPk(accessRequest.requesterId);
       const doc = await Document.findByPk(accessRequest.documentId, { attributes: ['title'] });

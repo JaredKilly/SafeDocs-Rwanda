@@ -17,12 +17,14 @@ import {
   LockOpen as PublicIcon,
   VerifiedUser as VerifiedIcon,
   Warning as WarningIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import { RootState } from '../store';
 import { Document } from '../types';
 import apiService from '../services/api';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
+import DocumentPicker from '../components/DocumentPicker';
 
 // ── Constants ────────────────────────────────────────────────
 
@@ -93,6 +95,9 @@ const Government: React.FC = () => {
   // Filters
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
+
+  // Document picker
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Edit dialog
   const [editDoc, setEditDoc] = useState<GovDocument | null>(null);
@@ -171,6 +176,13 @@ const Government: React.FC = () => {
         title="Government Documents"
         subtitle="Classify, reference, and manage retention for official documents"
         breadcrumbs={[{ label: 'Home', path: '/dashboard' }, { label: 'Government Documents' }]}
+        action={
+          (user?.role === 'admin' || user?.role === 'manager') ? (
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setPickerOpen(true)}>
+              Classify Document
+            </Button>
+          ) : undefined
+        }
       />
 
       {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}</Alert>}
@@ -290,10 +302,22 @@ const Government: React.FC = () => {
         </Table>
       </TableContainer>
 
+      {/* ── Document Picker ── */}
+      <DocumentPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title="Select Document to Classify"
+        excludeIds={docs.map(d => d.id)}
+        onSelect={(doc: Document) => {
+          setPickerOpen(false);
+          openEdit(doc as GovDocument);
+        }}
+      />
+
       {/* Info box when no gov docs */}
       {!loading && docs.length === 0 && (
         <Alert severity="info" sx={{ mt: 2 }} icon={<VerifiedIcon />}>
-          To classify a document, open any document from the <strong>Documents</strong> page, or use the Classify button here once documents are uploaded.
+          Click <strong>Classify Document</strong> above to select a document and assign government classification.
         </Alert>
       )}
 

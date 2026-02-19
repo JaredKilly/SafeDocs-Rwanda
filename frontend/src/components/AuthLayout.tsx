@@ -13,12 +13,6 @@ const highlights = [
   'Granular access control with audit trails',
 ];
 
-const metrics = [
-  { label: 'Documents Secured', value: '120K+' },
-  { label: 'Requests Processed', value: '3.4M' },
-  { label: 'Avg. Uptime', value: '99.98%' },
-];
-
 export const AuthLayout: React.FC<AuthLayoutProps> = ({ title, subtitle, children }) => {
   const theme = useTheme();
 

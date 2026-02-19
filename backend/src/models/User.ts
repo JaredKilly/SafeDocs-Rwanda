@@ -11,11 +11,12 @@ interface UserAttributes {
   role: 'admin' | 'manager' | 'user';
   isActive: boolean;
   tokenVersion: number;
+  organizationId?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-interface UserCreationAttributes extends Optional<UserAttributes, 'id' | 'isActive' | 'role'> {}
+interface UserCreationAttributes extends Optional<UserAttributes, 'id' | 'isActive' | 'role' | 'organizationId'> {}
 
 class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
   public id!: number;
@@ -26,6 +27,7 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
   public role!: 'admin' | 'manager' | 'user';
   public isActive!: boolean;
   public tokenVersion!: number;
+  public organizationId?: number;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 
@@ -93,6 +95,14 @@ User.init(
       type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 0,
+    },
+    organizationId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'organizations',
+        key: 'id',
+      },
     },
   },
   {

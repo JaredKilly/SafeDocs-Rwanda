@@ -19,6 +19,8 @@ import AuditLogs from './pages/AuditLogs';
 import HR from './pages/HR';
 import Government from './pages/Government';
 import Healthcare from './pages/Healthcare';
+import MediaLibrary from './pages/MediaLibrary';
+import Analytics from './pages/Analytics';
 // Marketing / public pages
 import Security from './pages/Security';
 import Pricing from './pages/Pricing';
@@ -26,6 +28,7 @@ import Changelog from './pages/Changelog';
 import About from './pages/About';
 import Careers from './pages/Careers';
 import Contact from './pages/Contact';
+import Waitlist from './pages/Waitlist';
 import Press from './pages/Press';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
@@ -57,6 +60,8 @@ const App: React.FC = () => {
             <Route path="/hr" element={<HR />} />
             <Route path="/government" element={<Government />} />
             <Route path="/healthcare" element={<Healthcare />} />
+            <Route path="/media" element={<MediaLibrary />} />
+            <Route path="/analytics" element={<Analytics />} />
             {/* Public / marketing pages */}
             <Route path="/security" element={<Security />} />
             <Route path="/pricing" element={<Pricing />} />
@@ -64,6 +69,7 @@ const App: React.FC = () => {
             <Route path="/about" element={<About />} />
             <Route path="/careers" element={<Careers />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/waitlist" element={<Waitlist />} />
             <Route path="/press" element={<Press />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />

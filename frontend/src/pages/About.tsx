@@ -15,40 +15,76 @@ import {
 import {
   Flag as MissionIcon,
   Visibility as VisionIcon,
-  Favorite as ValuesIcon,
+  Security as SecurityIcon,
+  VerifiedUser as ReliabilityIcon,
+  Dashboard as SimplicityIcon,
+  LocalOffer as AffordabilityIcon,
+  Support as CustomerFocusIcon,
+  Business as ProfessionalismIcon,
   ArrowForward as ArrowForwardIcon,
 } from '@mui/icons-material';
 import MarketingLayout from '../components/MarketingLayout';
 
-const values = [
+const coreValues = [
   {
-    icon: <MissionIcon sx={{ fontSize: 36 }} />,
+    icon: <SecurityIcon sx={{ fontSize: 36 }} />,
     color: '#007BFF',
-    title: 'Our Mission',
+    title: 'Security First',
     description:
-      'To empower Rwandan organisations to securely digitise, manage, and share their documents — eliminating paperwork, reducing costs, and accelerating service delivery.',
+      'We protect client information with strict confidentiality and secure handling.',
   },
   {
-    icon: <VisionIcon sx={{ fontSize: 36 }} />,
-    color: '#FF7A21',
-    title: 'Our Vision',
+    icon: <ReliabilityIcon sx={{ fontSize: 36 }} />,
+    color: '#00B89F',
+    title: 'Reliability',
     description:
-      'A fully paperless Rwanda where every organisation — from a rural health clinic to a national government agency — can access and protect their records instantly and securely.',
+      'We deliver accurate, organized, and dependable document solutions every time.',
   },
   {
-    icon: <ValuesIcon sx={{ fontSize: 36 }} />,
+    icon: <SimplicityIcon sx={{ fontSize: 36 }} />,
     color: '#9B51E0',
-    title: 'Our Values',
+    title: 'Simplicity',
     description:
-      'Security first. Local context. Radical transparency. We build for the community we serve and we hold ourselves accountable to the people who trust us with their data.',
+      'We make document management easy and practical for everyday business use.',
+  },
+  {
+    icon: <AffordabilityIcon sx={{ fontSize: 36 }} />,
+    color: '#2E7D32',
+    title: 'Affordability',
+    description:
+      'We provide high-quality services designed for small and local businesses.',
+  },
+  {
+    icon: <CustomerFocusIcon sx={{ fontSize: 36 }} />,
+    color: '#FF7A21',
+    title: 'Customer Focus',
+    description:
+      'We listen, understand business needs, and provide solutions that truly help.',
+  },
+  {
+    icon: <ProfessionalismIcon sx={{ fontSize: 36 }} />,
+    color: '#0B1D2E',
+    title: 'Professionalism',
+    description:
+      'We work with integrity, discipline, and respect for records management standards.',
   },
 ];
 
+const mission = {
+  title: 'Our Mission',
+  description: 'To help Rwandan businesses organize, protect, and digitize their records so they can work efficiently, reduce risks, and focus on growing their businesses.',
+};
+
+const vision = {
+  title: 'Our Vision',
+  description: 'To become Rwanda\'s trusted leader in digital archiving and smart document management for both small and growing businesses.',
+};
+
 const milestones = [
-  { year: '2023', event: 'SafeDocs Rwanda founded in Kigali by a team of Rwandan engineers.' },
-  { year: '2024', event: 'First 50 organisations onboarded. OCR engine launched in beta.' },
-  { year: '2025', event: 'Version 1.0 released. Partnership with Rwanda Development Board.' },
-  { year: '2026', event: 'Professional and Enterprise tiers launched. Expansion to EAC region begins.' },
+  { year: 'Nov 2025', event: 'SafeDocs Rwanda founded. Physical records organization services launched for local institutions.' },
+  { year: '2026', event: 'Digital platform launched. First organizations onboarded with scanning, indexing, and secure storage.' },
+  { year: '2027', event: 'Expansion of services. Partnerships with business associations and government agencies.' },
+  { year: '2028', event: 'Regional growth. Scaling to support businesses across Rwanda and the EAC.' },
 ];
 
 const About: React.FC = () => {
@@ -80,13 +116,81 @@ const About: React.FC = () => {
         </Container>
       </Box>
 
-      {/* Mission / Vision / Values */}
+      {/* Mission & Vision */}
+      <Box sx={{ bgcolor: '#F2F4F7', py: 10 }}>
+        <Container maxWidth="lg">
+          <Grid container spacing={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Card sx={{ height: '100%', p: 1 }}>
+                <CardContent sx={{ p: 4 }}>
+                  <Box
+                    sx={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: 3,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: alpha('#007BFF', 0.1),
+                      color: '#007BFF',
+                      mb: 2.5,
+                    }}
+                  >
+                    <MissionIcon sx={{ fontSize: 36 }} />
+                  </Box>
+                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+                    {mission.title}
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.9 }}>
+                    {mission.description}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Card sx={{ height: '100%', p: 1 }}>
+                <CardContent sx={{ p: 4 }}>
+                  <Box
+                    sx={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: 3,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: alpha('#FF7A21', 0.1),
+                      color: '#FF7A21',
+                      mb: 2.5,
+                    }}
+                  >
+                    <VisionIcon sx={{ fontSize: 36 }} />
+                  </Box>
+                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+                    {vision.title}
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.9 }}>
+                    {vision.description}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </Container>
+      </Box>
+
+      {/* Core Values */}
       <Box sx={{ py: 10 }}>
         <Container maxWidth="lg">
+          <Box sx={{ textAlign: 'center', mb: 6 }}>
+            <Chip label="What We Stand For" sx={{ mb: 2, fontWeight: 700, bgcolor: alpha('#007BFF', 0.12), color: '#007BFF' }} />
+            <Typography variant="h4" sx={{ fontWeight: 800 }}>
+              Our Core Values
+            </Typography>
+          </Box>
           <Grid container spacing={4}>
-            {values.map((v, i) => (
-              <Grid size={{ xs: 12, md: 4 }} key={i}>
-                <Card sx={{ height: '100%', p: 1 }}>
+            {coreValues.map((v, i) => (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={i}>
+                <Card sx={{ height: '100%', p: 1, transition: 'all 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 3 } }}>
                   <CardContent sx={{ p: 3.5 }}>
                     <Box
                       sx={{
@@ -125,20 +229,46 @@ const About: React.FC = () => {
           </Typography>
           <Stack spacing={2.5}>
             <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.9 }}>
-              Rwanda has made extraordinary strides in digital transformation — from e-government
-              services to cashless payments. Yet document management in most organisations
-              remained stubbornly analogue: filing cabinets, lost papers, manual indexing, and
-              slow approval workflows.
+              Rwanda is growing fast in digital transformation, but many businesses still struggle
+              with paper files, lost documents, and limited storage space.
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.9 }}>
-              SafeDocs Rwanda was founded to close that gap. We designed a platform that respects
-              the realities of Rwandan institutions — from limited bandwidth in rural areas to
-              the compliance requirements of government agencies — while delivering a modern,
-              intuitive experience that anyone can use.
+              SafeDocs Rwanda was created to solve this challenge.
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.9 }}>
-              Today, organisations across Kigali and beyond use SafeDocs to store millions of
-              documents, saving hours of administrative work every day. We are just getting started.
+              Founded by a professional in Records and Archives Management, SafeDocs Rwanda helps
+              organizations move from paper-based systems to organized and secure digital records.
+              The idea came from seeing how poor document management causes delays, lost
+              information, and operational risks for many businesses.
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.9 }}>
+              We started by offering physical records organization and have already supported
+              local institutions in improving their filing systems. Our next step is expanding
+              into full digital archiving using professional scanning, indexing, and secure
+              storage solutions.
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.9 }}>
+              Today, SafeDocs Rwanda is building affordable and practical document solutions
+              designed specifically for small and growing businesses.
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.9 }}>
+              We believe that when businesses can easily find and protect their information,
+              they save time, reduce costs, and make better decisions.
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.9 }}>
+              And this is just the beginning.
+            </Typography>
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 700,
+                color: 'primary.main',
+                mt: 3,
+                letterSpacing: 0.5,
+                fontSize: '1.1rem',
+              }}
+            >
+              Your Documents. Safe. Organized. Accessible.
             </Typography>
           </Stack>
         </Container>
@@ -186,13 +316,21 @@ const About: React.FC = () => {
           <Typography variant="body1" sx={{ opacity: 0.85, mb: 4, lineHeight: 1.8 }}>
             Become part of the community transforming how Rwanda manages its documents.
           </Typography>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="center">
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="center" flexWrap="wrap">
+            <Button
+              variant="contained"
+              size="large"
+              onClick={() => navigate('/waitlist')}
+              endIcon={<ArrowForwardIcon />}
+              sx={{ bgcolor: '#FF7A21', '&:hover': { bgcolor: '#CC611A' }, px: 4, py: 1.5, fontWeight: 700 }}
+            >
+              Join the Waitlist
+            </Button>
             <Button
               variant="contained"
               size="large"
               onClick={() => navigate('/register')}
-              endIcon={<ArrowForwardIcon />}
-              sx={{ bgcolor: '#FF7A21', '&:hover': { bgcolor: '#CC611A' }, px: 4, py: 1.5, fontWeight: 700 }}
+              sx={{ px: 4, py: 1.5, fontWeight: 700 }}
             >
               Get Started Free
             </Button>

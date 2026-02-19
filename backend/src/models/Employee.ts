@@ -16,13 +16,14 @@ interface EmployeeAttributes {
   status: EmployeeStatus;
   notes?: string;
   createdBy: number;
+  organizationId?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 interface EmployeeCreationAttributes extends Optional<
   EmployeeAttributes,
-  'id' | 'email' | 'phone' | 'startDate' | 'endDate' | 'notes' | 'status'
+  'id' | 'email' | 'phone' | 'startDate' | 'endDate' | 'notes' | 'status' | 'organizationId'
 > {}
 
 class Employee extends Model<EmployeeAttributes, EmployeeCreationAttributes>
@@ -39,6 +40,7 @@ class Employee extends Model<EmployeeAttributes, EmployeeCreationAttributes>
   public status!: EmployeeStatus;
   public notes?: string;
   public createdBy!: number;
+  public organizationId?: number;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -61,6 +63,11 @@ Employee.init(
     },
     notes: { type: DataTypes.TEXT, allowNull: true },
     createdBy: { type: DataTypes.INTEGER, allowNull: false },
+    organizationId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: { model: 'organizations', key: 'id' },
+    },
   },
   {
     sequelize,

@@ -38,6 +38,7 @@ const footerColumns = [
       { label: 'Security', to: '/security' },
       { label: 'Pricing', to: '/pricing' },
       { label: 'Changelog', to: '/changelog' },
+      { label: 'Join Waitlist', to: '/waitlist' },
     ],
   },
   {
@@ -113,6 +114,9 @@ const MarketingLayout: React.FC<MarketingLayoutProps> = ({ children }) => {
                   About
                 </Button>
                 <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
+                <Button color="inherit" sx={{ fontWeight: 600 }} component={RouterLink} to="/waitlist">
+                  Join Waitlist
+                </Button>
                 <Button color="inherit" sx={{ fontWeight: 600 }} onClick={() => navigate('/login')}>
                   Sign In
                 </Button>
@@ -130,8 +134,11 @@ const MarketingLayout: React.FC<MarketingLayoutProps> = ({ children }) => {
           {isMobile && mobileMenuOpen && (
             <Box sx={{ pb: 2 }}>
               <Stack spacing={1}>
-                <Button fullWidth onClick={() => navigate('/login')}>Sign In</Button>
-                <Button fullWidth variant="contained" onClick={() => navigate('/register')}>
+                <Button fullWidth component={RouterLink} to="/waitlist" onClick={() => setMobileMenuOpen(false)}>
+                  Join Waitlist
+                </Button>
+                <Button fullWidth onClick={() => { navigate('/login'); setMobileMenuOpen(false); }}>Sign In</Button>
+                <Button fullWidth variant="contained" onClick={() => { navigate('/register'); setMobileMenuOpen(false); }}>
                   Get Started Free
                 </Button>
               </Stack>

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Op } from 'sequelize';
-import { User } from '../models';
+import { User, Organization } from '../models';
 import { generateToken } from '../utils/jwt';
 import { body, validationResult } from 'express-validator';
 
@@ -56,6 +56,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       email: user.email,
       role: user.role,
       tokenVersion: user.tokenVersion,
+      organizationId: user.organizationId ?? null,
     });
 
     res.status(201).json({
@@ -67,6 +68,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         email: user.email,
         fullName: user.fullName,
         role: user.role,
+        organizationId: user.organizationId ?? null,
       },
     });
   } catch (error) {
@@ -112,6 +114,13 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Fetch organization name if user belongs to one
+    let organizationName: string | undefined;
+    if (user.organizationId) {
+      const org = await Organization.findByPk(user.organizationId);
+      organizationName = org?.name;
+    }
+
     // Generate token
     const token = generateToken({
       id: user.id,
@@ -120,6 +129,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       email: user.email,
       role: user.role,
       tokenVersion: user.tokenVersion,
+      organizationId: user.organizationId ?? null,
     });
 
     res.status(200).json({
@@ -131,6 +141,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         email: user.email,
         fullName: user.fullName,
         role: user.role,
+        organizationId: user.organizationId ?? null,
+        organizationName,
       },
     });
   } catch (error) {
@@ -148,6 +160,9 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
 
     const user = await User.findByPk(req.user.userId, {
       attributes: { exclude: ['password'] },
+      include: [
+        { model: Organization, as: 'organization', attributes: ['id', 'name', 'slug'] },
+      ],
     });
 
     if (!user) {

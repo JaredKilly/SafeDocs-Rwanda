@@ -3,7 +3,6 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions,
   Button,
   Box,
   Typography,
@@ -17,7 +16,6 @@ import {
   Download as DownloadIcon,
   ZoomIn as ZoomInIcon,
   ZoomOut as ZoomOutIcon,
-  Fullscreen as FullscreenIcon,
 } from '@mui/icons-material';
 import { Document } from '../types';
 
@@ -42,6 +40,7 @@ const DocumentPreview: React.FC<Props> = ({ open, onClose, document }) => {
         URL.revokeObjectURL(previewUrl);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [document, open]);
 
   const loadPreview = async () => {
@@ -51,12 +50,12 @@ const DocumentPreview: React.FC<Props> = ({ open, onClose, document }) => {
     setError(null);
 
     try {
-      const token = localStorage.getItem('token');
+      const authToken = localStorage.getItem('token');
       const response = await fetch(
         `${process.env.REACT_APP_API_URL}/documents/${document.id}/download`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${authToken}`,
           },
         }
       );
@@ -78,7 +77,6 @@ const DocumentPreview: React.FC<Props> = ({ open, onClose, document }) => {
 
   const handleDownload = () => {
     if (document) {
-      const token = localStorage.getItem('token');
       const link = window.document.createElement('a');
       link.href = `${process.env.REACT_APP_API_URL}/documents/${document.id}/download`;
       link.download = document.fileName;

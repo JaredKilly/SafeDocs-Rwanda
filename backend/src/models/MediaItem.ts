@@ -1,7 +1,7 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from '../config/database';
 
-interface DocumentAttributes {
+interface MediaItemAttributes {
   id: number;
   title: string;
   description?: string;
@@ -9,21 +9,25 @@ interface DocumentAttributes {
   filePath: string;
   fileSize: number;
   mimeType: string;
+  mediaType: 'image' | 'video';
   storageType: 'local' | 'minio';
-  folderId?: number;
+  thumbnailPath?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+  category: 'general' | 'marketing' | 'training' | 'event' | 'documentation' | 'other';
+  tags: string[];
   uploadedBy: number;
-  currentVersion: number;
   isDeleted: boolean;
   metadata?: object;
-  expiresAt?: Date;
   organizationId?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-interface DocumentCreationAttributes extends Optional<DocumentAttributes, 'id' | 'description' | 'folderId' | 'currentVersion' | 'isDeleted' | 'metadata' | 'storageType' | 'expiresAt' | 'organizationId'> {}
+interface MediaItemCreationAttributes extends Optional<MediaItemAttributes, 'id' | 'description' | 'thumbnailPath' | 'width' | 'height' | 'duration' | 'category' | 'tags' | 'isDeleted' | 'metadata' | 'storageType' | 'organizationId'> {}
 
-class Document extends Model<DocumentAttributes, DocumentCreationAttributes> implements DocumentAttributes {
+class MediaItem extends Model<MediaItemAttributes, MediaItemCreationAttributes> implements MediaItemAttributes {
   public id!: number;
   public title!: string;
   public description?: string;
@@ -31,19 +35,23 @@ class Document extends Model<DocumentAttributes, DocumentCreationAttributes> imp
   public filePath!: string;
   public fileSize!: number;
   public mimeType!: string;
+  public mediaType!: 'image' | 'video';
   public storageType!: 'local' | 'minio';
-  public folderId?: number;
+  public thumbnailPath?: string;
+  public width?: number;
+  public height?: number;
+  public duration?: number;
+  public category!: 'general' | 'marketing' | 'training' | 'event' | 'documentation' | 'other';
+  public tags!: string[];
   public uploadedBy!: number;
-  public currentVersion!: number;
   public isDeleted!: boolean;
   public metadata?: object;
-  public expiresAt?: Date;
   public organizationId?: number;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
 
-Document.init(
+MediaItem.init(
   {
     id: {
       type: DataTypes.INTEGER,
@@ -53,9 +61,7 @@ Document.init(
     title: {
       type: DataTypes.STRING(500),
       allowNull: false,
-      validate: {
-        notEmpty: true,
-      },
+      validate: { notEmpty: true },
     },
     description: {
       type: DataTypes.TEXT,
@@ -64,16 +70,12 @@ Document.init(
     fileName: {
       type: DataTypes.STRING(500),
       allowNull: false,
-      validate: {
-        notEmpty: true,
-      },
+      validate: { notEmpty: true },
     },
     filePath: {
       type: DataTypes.STRING(1000),
       allowNull: false,
-      validate: {
-        notEmpty: true,
-      },
+      validate: { notEmpty: true },
     },
     fileSize: {
       type: DataTypes.BIGINT,
@@ -83,18 +85,40 @@ Document.init(
       type: DataTypes.STRING(100),
       allowNull: false,
     },
+    mediaType: {
+      type: DataTypes.ENUM('image', 'video'),
+      allowNull: false,
+    },
     storageType: {
       type: DataTypes.ENUM('local', 'minio'),
       allowNull: false,
       defaultValue: 'local',
     },
-    folderId: {
+    thumbnailPath: {
+      type: DataTypes.STRING(1000),
+      allowNull: true,
+    },
+    width: {
       type: DataTypes.INTEGER,
       allowNull: true,
-      references: {
-        model: 'folders',
-        key: 'id',
-      },
+    },
+    height: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    duration: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    category: {
+      type: DataTypes.ENUM('general', 'marketing', 'training', 'event', 'documentation', 'other'),
+      allowNull: false,
+      defaultValue: 'general',
+    },
+    tags: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: [],
     },
     uploadedBy: {
       type: DataTypes.INTEGER,
@@ -104,11 +128,6 @@ Document.init(
         key: 'id',
       },
     },
-    currentVersion: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      defaultValue: 1,
-    },
     isDeleted: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
@@ -116,10 +135,6 @@ Document.init(
     },
     metadata: {
       type: DataTypes.JSONB,
-      allowNull: true,
-    },
-    expiresAt: {
-      type: DataTypes.DATE,
       allowNull: true,
     },
     organizationId: {
@@ -133,20 +148,15 @@ Document.init(
   },
   {
     sequelize,
-    tableName: 'documents',
+    tableName: 'media_items',
     timestamps: true,
     indexes: [
-      {
-        fields: ['folderId'],
-      },
-      {
-        fields: ['uploadedBy'],
-      },
-      {
-        fields: ['isDeleted'],
-      },
+      { fields: ['mediaType'] },
+      { fields: ['category'] },
+      { fields: ['uploadedBy'] },
+      { fields: ['isDeleted'] },
     ],
   }
 );
 
-export default Document;
+export default MediaItem;

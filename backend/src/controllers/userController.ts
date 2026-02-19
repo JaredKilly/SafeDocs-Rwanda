@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import User from '../models/User';
+import Organization from '../models/Organization';
 
 // Get current user profile
 export const getProfile = async (req: Request, res: Response): Promise<void> => {
@@ -157,7 +158,8 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const user = await User.create({ username, email, password, fullName, role, tokenVersion: 0 });
+    const { organizationId } = req.body;
+    const user = await User.create({ username, email, password, fullName, role, tokenVersion: 0, organizationId: organizationId || undefined });
 
     const created = await User.findByPk(user.id, { attributes: { exclude: ['password'] } });
     res.status(201).json({ message: 'User created successfully', user: created });
@@ -172,6 +174,9 @@ export const getAllUsers = async (req: Request, res: Response): Promise<void> =>
   try {
     const users = await User.findAll({
       attributes: { exclude: ['password'] },
+      include: [
+        { model: Organization, as: 'organization', attributes: ['id', 'name', 'slug'] },
+      ],
       order: [['createdAt', 'DESC']]
     });
 
@@ -186,7 +191,7 @@ export const getAllUsers = async (req: Request, res: Response): Promise<void> =>
 export const updateUserRole = async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
-    const { role } = req.body;
+    const { role, organizationId } = req.body;
 
     if (!['admin', 'manager', 'user'].includes(role)) {
       res.status(400).json({ message: 'Invalid role' });
@@ -200,10 +205,16 @@ export const updateUserRole = async (req: Request, res: Response): Promise<void>
     }
 
     user.role = role;
+    if (organizationId !== undefined) {
+      user.organizationId = organizationId || null;
+    }
     await user.save();
 
     const updatedUser = await User.findByPk(userId, {
-      attributes: { exclude: ['password'] }
+      attributes: { exclude: ['password'] },
+      include: [
+        { model: Organization, as: 'organization', attributes: ['id', 'name', 'slug'] },
+      ],
     });
 
     res.json(updatedUser);

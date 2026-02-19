@@ -175,4 +175,94 @@ export const fileExists = async (filePath: string, storageType: string = 'local'
   }
 };
 
+// ── Media-specific upload (images + videos, 200MB limit) ───────
+
+const mediaFileFilter = (
+  req: Express.Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
+  const allowedMediaTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+    'image/bmp',
+    'image/tiff',
+    'video/mp4',
+    'video/webm',
+    'video/x-msvideo',
+    'video/quicktime',
+  ];
+
+  if (allowedMediaTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only images (JPEG, PNG, GIF, WebP, SVG, BMP, TIFF) and videos (MP4, WebM, AVI, MOV) are allowed.'));
+  }
+};
+
+const mediaUpload = multer({
+  storage: USE_MINIO ? memoryStorage : storage,
+  fileFilter: mediaFileFilter,
+  limits: {
+    fileSize: 209715200, // 200MB
+  },
+});
+
+export const uploadMediaWithMinio = (fieldName: string) => {
+  return async (req: Request, res: any, next: any) => {
+    mediaUpload.single(fieldName)(req, res, async (err) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({
+              error: 'File too large. Maximum size for media is 200MB.',
+            });
+          }
+          return res.status(400).json({ error: err.message });
+        }
+        return res.status(400).json({ error: err.message });
+      }
+
+      if (USE_MINIO && req.file) {
+        try {
+          const file = req.file;
+          const timestamp = Date.now();
+          const randomSuffix = Math.round(Math.random() * 1e9);
+          const ext = path.extname(file.originalname);
+          const baseName = path.basename(file.originalname, ext);
+          const minioPath = `media/${timestamp}-${randomSuffix}-${baseName}${ext}`;
+
+          const uploadResult = await minioService.uploadFile(
+            minioPath,
+            file.buffer,
+            {
+              'Content-Type': file.mimetype,
+              'Content-Length': file.size.toString(),
+              'Original-Filename': file.originalname,
+            }
+          );
+
+          (req.file as any).minioPath = minioPath;
+          (req.file as any).minioEtag = uploadResult.etag;
+          (req.file as any).storageType = 'minio';
+          (req.file as any).path = minioPath;
+        } catch (error) {
+          console.error('MinIO media upload error:', error);
+          return res.status(500).json({
+            error: 'Failed to upload media file to storage service',
+          });
+        }
+      } else if (req.file) {
+        (req.file as any).storageType = 'local';
+      }
+
+      next();
+    });
+  };
+};
+
 export default upload;

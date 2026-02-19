@@ -19,12 +19,14 @@ import {
   Science as LabIcon,
   Medication as RxIcon,
   Article as NoteIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import { RootState } from '../store';
 import { Document, HCMeta, HCRecordType, HCPrivacyLevel, HC_RECORD_LABELS, HC_PRIVACY_LABELS, HealthcareStats } from '../types';
 import apiService from '../services/api';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
+import DocumentPicker from '../components/DocumentPicker';
 
 // ── Constants ────────────────────────────────────────────────
 
@@ -109,6 +111,9 @@ const Healthcare: React.FC = () => {
   const [search, setSearch] = useState('');
   const [recordTypeFilter, setRecordTypeFilter] = useState('');
   const [privacyFilter, setPrivacyFilter] = useState('');
+
+  // Document picker
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Edit dialog
   const [editDoc, setEditDoc] = useState<HCDocument | null>(null);
@@ -196,6 +201,13 @@ const Healthcare: React.FC = () => {
         title="Healthcare Documents"
         subtitle="Patient records, privacy tiers, consent tracking, and retention management"
         breadcrumbs={[{ label: 'Home', path: '/dashboard' }, { label: 'Healthcare Documents' }]}
+        action={
+          canSeeStats ? (
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setPickerOpen(true)}>
+              Add Record
+            </Button>
+          ) : undefined
+        }
       />
 
       {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}</Alert>}
@@ -348,9 +360,21 @@ const Healthcare: React.FC = () => {
         </Table>
       </TableContainer>
 
+      {/* ── Document Picker ── */}
+      <DocumentPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title="Select Document for Healthcare"
+        excludeIds={docs.map(d => d.id)}
+        onSelect={(doc: Document) => {
+          setPickerOpen(false);
+          openEdit(doc as HCDocument);
+        }}
+      />
+
       {!loading && docs.length === 0 && (
         <Alert severity="info" sx={{ mt: 2 }} icon={<HealthIcon />}>
-          To tag a healthcare document, open any document from the <strong>Documents</strong> page, or click the Edit button once documents are uploaded.
+          Click <strong>Add Record</strong> above to select a document and assign healthcare metadata.
         </Alert>
       )}
 

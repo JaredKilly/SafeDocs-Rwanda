@@ -15,6 +15,17 @@ import EncryptionMetadata from './EncryptionMetadata';
 import DocumentVersion from './DocumentVersion';
 import Employee from './Employee';
 import EmployeeDocument from './EmployeeDocument';
+import MediaItem from './MediaItem';
+import Organization from './Organization';
+import Notification from './Notification';
+import Waitlist from './Waitlist';
+
+// Organization relationships
+Organization.hasMany(User, { foreignKey: 'organizationId', as: 'users' });
+Organization.hasMany(Document, { foreignKey: 'organizationId', as: 'documents' });
+Organization.hasMany(Folder, { foreignKey: 'organizationId', as: 'folders' });
+Organization.hasMany(MediaItem, { foreignKey: 'organizationId', as: 'mediaItems' });
+Organization.hasMany(Employee, { foreignKey: 'organizationId', as: 'employees' });
 
 // User relationships
 User.hasMany(Folder, { foreignKey: 'createdBy', as: 'folders' });
@@ -26,6 +37,7 @@ User.hasMany(DocumentPermission, { foreignKey: 'grantedBy', as: 'grantedPermissi
 User.hasMany(ShareLink, { foreignKey: 'createdBy', as: 'shareLinks' });
 User.hasMany(AccessRequest, { foreignKey: 'requesterId', as: 'accessRequests' });
 User.hasMany(Employee, { foreignKey: 'createdBy', as: 'employeesCreated' });
+User.belongsTo(Organization, { foreignKey: 'organizationId', as: 'organization' });
 
 // Folder relationships
 Folder.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
@@ -33,6 +45,7 @@ Folder.belongsTo(Folder, { foreignKey: 'parentId', as: 'parent' });
 Folder.hasMany(Folder, { foreignKey: 'parentId', as: 'children' });
 Folder.hasMany(Document, { foreignKey: 'folderId', as: 'documents' });
 Folder.hasMany(FolderPermission, { foreignKey: 'folderId', as: 'permissions' });
+Folder.belongsTo(Organization, { foreignKey: 'organizationId', as: 'organization' });
 
 // Document relationships
 Document.belongsTo(User, { foreignKey: 'uploadedBy', as: 'uploader' });
@@ -46,6 +59,7 @@ Document.hasOne(FileChecksum, { foreignKey: 'documentId', as: 'checksum' });
 Document.hasOne(EncryptionMetadata, { foreignKey: 'documentId', as: 'encryption' });
 Document.hasMany(DocumentVersion, { foreignKey: 'documentId', as: 'versions' });
 Document.belongsToMany(Employee, { through: EmployeeDocument, foreignKey: 'documentId', otherKey: 'employeeId', as: 'linkedEmployees' });
+Document.belongsTo(Organization, { foreignKey: 'organizationId', as: 'organization' });
 DocumentVersion.belongsTo(Document, { foreignKey: 'documentId', as: 'document' });
 DocumentVersion.belongsTo(User, { foreignKey: 'uploadedBy', as: 'uploader' });
 
@@ -85,6 +99,7 @@ EncryptionMetadata.belongsTo(Document, { foreignKey: 'documentId', as: 'document
 
 // Employee relationships
 Employee.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
+Employee.belongsTo(Organization, { foreignKey: 'organizationId', as: 'organization' });
 Employee.belongsToMany(Document, { through: EmployeeDocument, foreignKey: 'employeeId', otherKey: 'documentId', as: 'documents' });
 Employee.hasMany(EmployeeDocument, { foreignKey: 'employeeId', as: 'employeeDocuments' });
 
@@ -92,6 +107,16 @@ Employee.hasMany(EmployeeDocument, { foreignKey: 'employeeId', as: 'employeeDocu
 EmployeeDocument.belongsTo(Employee, { foreignKey: 'employeeId', as: 'employee' });
 EmployeeDocument.belongsTo(Document, { foreignKey: 'documentId', as: 'document' });
 EmployeeDocument.belongsTo(User, { foreignKey: 'addedBy', as: 'addedByUser' });
+
+// MediaItem relationships
+MediaItem.belongsTo(User, { foreignKey: 'uploadedBy', as: 'uploader' });
+MediaItem.belongsTo(Organization, { foreignKey: 'organizationId', as: 'organization' });
+User.hasMany(MediaItem, { foreignKey: 'uploadedBy', as: 'mediaItems' });
+
+// Notification relationships
+Notification.belongsTo(User, { foreignKey: 'recipientId', as: 'recipient' });
+Notification.belongsTo(User, { foreignKey: 'actorId', as: 'actor' });
+User.hasMany(Notification, { foreignKey: 'recipientId', as: 'notifications' });
 
 export {
   User,
@@ -110,12 +135,17 @@ export {
   DocumentVersion,
   Employee,
   EmployeeDocument,
+  MediaItem,
+  Organization,
+  Notification,
+  Waitlist,
 };
 
 export const syncDatabase = async (force: boolean = false) => {
   const opts = { force };
   try {
     // Sync all tables — creates tables that don't exist, no destructive alters
+    await Organization.sync(opts);
     await User.sync(opts);
     await Group.sync(opts);
     await GroupMember.sync(opts);
@@ -132,6 +162,9 @@ export const syncDatabase = async (force: boolean = false) => {
     await AuditLog.sync(opts);
     await Employee.sync(opts);
     await EmployeeDocument.sync(opts);
+    await MediaItem.sync(opts);
+    await Notification.sync(opts);
+    await Waitlist.sync(opts);
 
     // Safe idempotent column patches — ADD COLUMN IF NOT EXISTS never fails on re-run
     if (!force) {
@@ -140,6 +173,22 @@ export const syncDatabase = async (force: boolean = false) => {
       );
       await sequelize.query(
         `ALTER TABLE documents ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP WITH TIME ZONE`
+      );
+      // Organization multi-tenancy columns
+      await sequelize.query(
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS "organizationId" INTEGER REFERENCES organizations(id)`
+      );
+      await sequelize.query(
+        `ALTER TABLE documents ADD COLUMN IF NOT EXISTS "organizationId" INTEGER REFERENCES organizations(id)`
+      );
+      await sequelize.query(
+        `ALTER TABLE folders ADD COLUMN IF NOT EXISTS "organizationId" INTEGER REFERENCES organizations(id)`
+      );
+      await sequelize.query(
+        `ALTER TABLE media_items ADD COLUMN IF NOT EXISTS "organizationId" INTEGER REFERENCES organizations(id)`
+      );
+      await sequelize.query(
+        `ALTER TABLE employees ADD COLUMN IF NOT EXISTS "organizationId" INTEGER REFERENCES organizations(id)`
       );
     }
 

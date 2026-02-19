@@ -9,12 +9,21 @@ import {
   linkDocument,
   unlinkDocument,
   getHRStats,
+  getHRDocs,
+  setHRDocMetadata,
+  clearHRDocMetadata,
 } from '../controllers/hrController';
 
 const router = Router();
 
 // All HR routes require authentication; most also require manager or admin
 router.get('/stats', authenticate, authorize('admin', 'manager'), getHRStats);
+
+// HR document classification (by organization) — must be before /:id to avoid conflict
+router.get('/documents/classified', authenticate, authorize('admin', 'manager'), getHRDocs);
+router.put('/documents/:id/metadata', authenticate, authorize('admin', 'manager'), setHRDocMetadata);
+router.delete('/documents/:id/metadata', authenticate, authorize('admin', 'manager'), clearHRDocMetadata);
+
 router.get('/', authenticate, authorize('admin', 'manager'), getEmployees);
 router.get('/:id', authenticate, authorize('admin', 'manager'), getEmployee);
 router.post('/', authenticate, authorize('admin', 'manager'), createEmployee);

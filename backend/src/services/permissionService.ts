@@ -443,10 +443,13 @@ export async function listUserAccessibleDocuments(
       return [];
     }
 
-    // Get all documents
+    // Get all documents — scoped by organization for non-admin users
     const whereClause: any = { isDeleted: false };
     if (filters?.folderId) {
       whereClause.folderId = filters.folderId;
+    }
+    if (user.organizationId && user.role !== 'admin') {
+      whereClause.organizationId = user.organizationId;
     }
 
     const documents = await Document.findAll({

@@ -25,6 +25,8 @@ import { Employee, HRCategory, HRStats, HR_CATEGORY_LABELS, EmployeeStatus } fro
 import apiService from '../services/api';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
+import DocumentPicker from '../components/DocumentPicker';
+import { Document } from '../types';
 
 // ─── helpers ────────────────────────────────────────────────
 
@@ -93,9 +95,11 @@ const HR: React.FC = () => {
   // Link document dialog
   const [linkTarget, setLinkTarget] = useState<Employee | null>(null);
   const [linkDocId, setLinkDocId] = useState('');
+  const [linkDocTitle, setLinkDocTitle] = useState('');
   const [linkCategory, setLinkCategory] = useState<HRCategory>('other');
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -334,7 +338,7 @@ const HR: React.FC = () => {
                       <TableCell align="right">
                         <Stack direction="row" spacing={0.5} justifyContent="flex-end">
                           <Tooltip title="Link Document">
-                            <IconButton size="small" color="primary" onClick={() => { setLinkTarget(emp); setLinkDocId(''); setLinkCategory('other'); setLinkError(null); }}>
+                            <IconButton size="small" color="primary" onClick={() => { setLinkTarget(emp); setLinkDocId(''); setLinkDocTitle(''); setLinkCategory('other'); setLinkError(null); setPickerOpen(true); }}>
                               <LinkIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -476,21 +480,32 @@ const HR: React.FC = () => {
         </DialogActions>
       </Dialog>
 
+      {/* ── Document Picker ── */}
+      <DocumentPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title={`Select Document for ${linkTarget?.fullName || ''}`}
+        onSelect={(doc: Document) => {
+          setLinkDocId(String(doc.id));
+          setLinkDocTitle(doc.title);
+          setPickerOpen(false);
+        }}
+      />
+
       {/* ── Link Document Dialog ── */}
-      <Dialog open={!!linkTarget} onClose={() => setLinkTarget(null)} maxWidth="xs" fullWidth>
+      <Dialog open={!!linkTarget && !pickerOpen && !!linkDocId} onClose={() => setLinkTarget(null)} maxWidth="xs" fullWidth>
         <DialogTitle>Link Document — {linkTarget?.fullName}</DialogTitle>
         <DialogContent>
           {linkError && <Alert severity="error" sx={{ mb: 2 }}>{linkError}</Alert>}
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label="Document ID"
-              size="small"
-              fullWidth
-              type="number"
-              value={linkDocId}
-              onChange={e => setLinkDocId(e.target.value)}
-              helperText="Enter the document ID to link (find it in the Documents page)"
-            />
+            <Paper variant="outlined" sx={{ p: 2, bgcolor: 'action.hover' }}>
+              <Typography variant="body2" color="text.secondary">Selected Document</Typography>
+              <Typography variant="body1" fontWeight={600}>{linkDocTitle}</Typography>
+              <Typography variant="caption" color="text.secondary">ID: {linkDocId}</Typography>
+            </Paper>
+            <Button variant="outlined" size="small" onClick={() => setPickerOpen(true)}>
+              Change Document
+            </Button>
             <FormControl size="small" fullWidth>
               <InputLabel>Category</InputLabel>
               <Select label="Category" value={linkCategory} onChange={e => setLinkCategory(e.target.value as HRCategory)}>

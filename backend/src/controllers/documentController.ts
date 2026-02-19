@@ -135,6 +135,7 @@ export const uploadDocument = async (req: Request, res: Response): Promise<void>
       storageType: (req.file as any).storageType || 'local',
       folderId: folderId || null,
       uploadedBy: req.user.userId,
+      organizationId: req.user.organizationId ?? undefined,
       metadata: ocrText ? { ocrText } : undefined,
       expiresAt: expiresAt ? new Date(expiresAt) : undefined,
     });

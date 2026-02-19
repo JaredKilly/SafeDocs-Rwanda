@@ -20,6 +20,11 @@ import scannerRoutes from './routes/scannerRoutes';
 import hrRoutes from './routes/hrRoutes';
 import govRoutes from './routes/govRoutes';
 import healthcareRoutes from './routes/healthcareRoutes';
+import mediaRoutes from './routes/mediaRoutes';
+import orgRoutes from './routes/orgRoutes';
+import analyticsRoutes from './routes/analyticsRoutes';
+import notificationRoutes from './routes/notificationRoutes';
+import waitlistRoutes from './routes/waitlistRoutes';
 
 dotenv.config();
 
@@ -28,11 +33,31 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(helmet());
+
+// CORS: support comma-separated origins in CORS_ORIGIN env var
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error(`Origin ${origin} not allowed by CORS`));
+  },
   credentials: true,
 }));
-app.use(morgan('dev'));
+
+// Trust proxy in production (Render, Railway, Heroku, etc.)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(generalLimiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -87,6 +112,11 @@ app.use('/api/scanner', scannerRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/gov', govRoutes);
 app.use('/api/healthcare', healthcareRoutes);
+app.use('/api/media', mediaRoutes);
+app.use('/api/organizations', orgRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/waitlist', waitlistRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
