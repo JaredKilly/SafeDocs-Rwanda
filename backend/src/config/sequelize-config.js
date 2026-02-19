@@ -31,11 +31,9 @@ module.exports = {
         }),
     dialect: 'postgres',
     logging: false,
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false,
-      },
-    },
+    // Railway internal connections (*.railway.internal) don't use SSL
+    ...(process.env.DATABASE_URL && process.env.DATABASE_URL.includes('.railway.internal')
+      ? {}
+      : { dialectOptions: { ssl: { require: true, rejectUnauthorized: false } } }),
   },
 };
