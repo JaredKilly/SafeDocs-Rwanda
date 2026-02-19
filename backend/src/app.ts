@@ -30,7 +30,10 @@ dotenv.config();
 
 // Sanity check — visible in Railway deploy logs
 console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'SET ✅' : 'MISSING ❌');
-console.log('DATABASE_URL starts with:', process.env.DATABASE_URL?.substring(0, 40));
+try {
+  const { hostname, port } = new URL(process.env.DATABASE_URL || '');
+  console.log('DATABASE_URL host:', hostname, 'port:', port);
+} catch { console.log('DATABASE_URL is not a valid URL'); }
 console.log('NODE_ENV:', process.env.NODE_ENV || 'NOT SET ❌');
 
 const app: Application = express();
