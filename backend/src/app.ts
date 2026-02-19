@@ -62,7 +62,6 @@ const corsOptions: cors.CorsOptions = {
   credentials: true,
 };
 
-app.options('*', cors(corsOptions)); // handle preflight across all routes
 app.use(cors(corsOptions));
 
 // Trust proxy in production (Railway, Render, Heroku)
