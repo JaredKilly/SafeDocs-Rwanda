@@ -5,14 +5,19 @@ dotenv.config();
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+// SSL not needed for Railway internal connections (*.railway.internal)
+const dbUrl = process.env.DATABASE_URL || '';
+const isInternalRailway = dbUrl.includes('.railway.internal');
+const sslOptions = isProduction && !isInternalRailway
+  ? { ssl: { require: true, rejectUnauthorized: false } }
+  : {};
+
 // Support DATABASE_URL (used by Render, Railway, Heroku, Supabase, etc.)
-const sequelize = process.env.DATABASE_URL
-  ? new Sequelize(process.env.DATABASE_URL, {
+const sequelize = dbUrl
+  ? new Sequelize(dbUrl, {
       dialect: 'postgres',
       logging: isProduction ? false : console.log,
-      dialectOptions: isProduction
-        ? { ssl: { require: true, rejectUnauthorized: false } }
-        : {},
+      dialectOptions: sslOptions,
       pool: { max: 5, min: 0, acquire: 30000, idle: 10000 },
     })
   : new Sequelize({
@@ -23,9 +28,7 @@ const sequelize = process.env.DATABASE_URL
       password: process.env.DB_PASSWORD || '',
       dialect: 'postgres',
       logging: isProduction ? false : console.log,
-      dialectOptions: isProduction
-        ? { ssl: { require: true, rejectUnauthorized: false } }
-        : {},
+      dialectOptions: sslOptions,
       pool: { max: 5, min: 0, acquire: 30000, idle: 10000 },
     });
 
