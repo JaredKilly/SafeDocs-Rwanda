@@ -20,20 +20,15 @@ module.exports = {
     logging: false,
   },
   production: {
-    ...(process.env.DATABASE_URL
-      ? { use_env_variable: 'DATABASE_URL' }
-      : {
-          username: process.env.DB_USER,
-          password: process.env.DB_PASSWORD,
-          database: process.env.DB_NAME,
-          host: process.env.DB_HOST,
-          port: process.env.DB_PORT || 5432,
-        }),
+    url: process.env.DATABASE_URL,
     dialect: 'postgres',
     logging: false,
-    // Railway internal connections (*.railway.internal) don't use SSL
-    ...(process.env.DATABASE_URL && process.env.DATABASE_URL.includes('.railway.internal')
-      ? {}
-      : { dialectOptions: { ssl: { require: true, rejectUnauthorized: false } } }),
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false,
+        mode: 'require',
+      },
+    },
   },
 };

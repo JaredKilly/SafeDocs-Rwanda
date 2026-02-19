@@ -5,10 +5,8 @@ dotenv.config();
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// SSL not needed for Railway internal connections (*.railway.internal)
 const dbUrl = process.env.DATABASE_URL || '';
-const isInternalRailway = dbUrl.includes('.railway.internal');
-const sslOptions = isProduction && !isInternalRailway
+const sslOptions = isProduction
   ? { ssl: { require: true, rejectUnauthorized: false } }
   : {};
 
@@ -33,12 +31,24 @@ const sequelize = dbUrl
     });
 
 export const testConnection = async () => {
-  try {
-    await sequelize.authenticate();
-    console.log('✅ Database connection established successfully.');
-  } catch (error) {
-    console.error('❌ Unable to connect to the database:', error);
-    process.exit(1);
+  const maxRetries = 10;
+  const retryDelayMs = 3000;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await sequelize.authenticate();
+      console.log('✅ Database connection established successfully.');
+      return;
+    } catch (error) {
+      if (attempt === maxRetries) {
+        console.error('❌ Unable to connect to the database:', error);
+        process.exit(1);
+      }
+      console.warn(
+        `⚠️  DB connection attempt ${attempt}/${maxRetries} failed. Retrying in ${retryDelayMs / 1000}s...`
+      );
+      await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+    }
   }
 };
 

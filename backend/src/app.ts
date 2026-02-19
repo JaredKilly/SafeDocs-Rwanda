@@ -28,6 +28,10 @@ import waitlistRoutes from './routes/waitlistRoutes';
 
 dotenv.config();
 
+// Sanity check — visible in Railway deploy logs
+console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'SET ✅' : 'MISSING ❌');
+console.log('NODE_ENV:', process.env.NODE_ENV || 'NOT SET ❌');
+
 const app: Application = express();
 const PORT = process.env.PORT || 5000;
 
