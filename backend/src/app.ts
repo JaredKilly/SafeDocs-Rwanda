@@ -156,12 +156,8 @@ const startServer = async () => {
     // Test database connection
     await testConnection();
     
-    // Sync database models only in development; use migrations otherwise
-    if (process.env.NODE_ENV === 'development') {
-      await syncDatabase(false); // Set to true to force recreate tables
-    } else {
-      console.log('Skipping syncDatabase in non-development environment. Run migrations instead.');
-    }
+    // Sync database models — creates missing tables, never drops existing ones
+    await syncDatabase(false); // force: false — safe in production
     
     // Initialize MinIO if enabled
     if (process.env.USE_MINIO === 'true') {
