@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Box,
@@ -74,13 +74,7 @@ const SharedDocument: React.FC = () => {
   const [result, setResult] = useState<AccessResult | null>(null);
   const [downloading, setDownloading] = useState(false);
 
-  // Try to access without password first
-  useEffect(() => {
-    if (!token) return;
-    tryAccess(); // eslint-disable-line react-hooks/exhaustive-deps
-  }, [token]); // tryAccess is stable — defined once, intentionally omitted
-
-  const tryAccess = async (pwd?: string) => {
+  const tryAccess = useCallback(async (pwd?: string) => {
     try {
       const res = await fetch(`${API_URL}/shares/link/${token}/access`, {
         method: 'POST',
@@ -114,7 +108,13 @@ const SharedDocument: React.FC = () => {
       setErrorMsg('Network error. Please check your connection and try again.');
       setStep('error');
     }
-  };
+  }, [token]);
+
+  // Try to access without password first
+  useEffect(() => {
+    if (!token) return;
+    tryAccess();
+  }, [token, tryAccess]);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
