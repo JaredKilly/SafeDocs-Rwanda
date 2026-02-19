@@ -179,6 +179,7 @@ const Landing: React.FC = () => {
   const pricingPreview = [
     { name: 'Starter', price: 'Free', period: 'forever', color: '#007BFF', highlight: false },
     { name: 'Professional', price: 'RWF 25,000', period: '/month', color: '#FF7A21', highlight: true },
+    { name: 'Business', price: 'RWF 50,000', period: '/month', color: '#7C3AED', highlight: false },
     { name: 'Enterprise', price: 'Custom', period: 'contact sales', color: '#0B1D2E', highlight: false },
   ];
 
