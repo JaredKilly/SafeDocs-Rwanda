@@ -6,8 +6,10 @@ dotenv.config();
 const isProduction = process.env.NODE_ENV === 'production';
 
 const dbUrl = process.env.DATABASE_URL || '';
-const sslOptions = isProduction
-  ? { ssl: { require: true, rejectUnauthorized: false } }
+// Private Railway URLs (*.railway.internal) don't use SSL — public ones do
+const isInternalRailway = dbUrl.includes('.railway.internal');
+const sslOptions = isProduction && !isInternalRailway
+  ? { ssl: { rejectUnauthorized: false } }
   : {};
 
 // Support DATABASE_URL (Railway, Render, Heroku, Supabase) with fallback to individual vars
