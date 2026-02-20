@@ -20,8 +20,10 @@ import {
   VisibilityOff,
   ArrowBack as ArrowBackIcon,
   HowToReg as RegisterIcon,
+  MarkEmailRead as MarkEmailReadIcon,
 } from '@mui/icons-material';
-import { register, clearError } from '../store/authSlice';
+import { register, verifyOtp, clearError } from '../store/authSlice';
+import apiService from '../services/api';
 import { AppDispatch, RootState } from '../store';
 import AuthLayout from '../components/AuthLayout';
 import BrandLogo from '../components/BrandLogo';
@@ -57,6 +59,13 @@ const Register: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  // OTP step state
+  const [otpPending, setOtpPending] = useState(false);
+  const [pendingUserId, setPendingUserId] = useState<number | null>(null);
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [otpValue, setOtpValue] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+
   useEffect(() => {
     if (isAuthenticated) navigate('/dashboard');
   }, [isAuthenticated, navigate]);
@@ -65,12 +74,19 @@ const Register: React.FC = () => {
     return () => { dispatch(clearError()); };
   }, [dispatch]);
 
+  // Countdown timer for resend button
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setValidationError('');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
       setValidationError('Passwords do not match.');
@@ -81,12 +97,121 @@ const Register: React.FC = () => {
       return;
     }
     const { confirmPassword, ...registerData } = formData;
-    dispatch(register({ ...registerData, role: 'user' }));
+    const result = await dispatch(register({ ...registerData, role: 'user' }));
+    if (register.fulfilled.match(result) && result.payload?.requiresOtp) {
+      setPendingUserId(result.payload.userId);
+      setPendingEmail(formData.email);
+      setOtpPending(true);
+      setResendCooldown(60);
+    }
+  };
+
+  const handleOtpVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingUserId) return;
+    dispatch(verifyOtp({ userId: pendingUserId, otp: otpValue }));
+  };
+
+  const handleResendOtp = async () => {
+    if (!pendingUserId || resendCooldown > 0) return;
+    try {
+      await apiService.resendOtp(pendingUserId);
+      setResendCooldown(60);
+      dispatch(clearError());
+    } catch {
+      // error handled by Redux
+    }
   };
 
   const pwStrength = getPasswordStrength(formData.password);
   const passwordMismatch = formData.confirmPassword.length > 0 && formData.password !== formData.confirmPassword;
 
+  // ── OTP verification step ──────────────────────────────────────────────────
+  if (otpPending) {
+    return (
+      <AuthLayout title="Verify your email" subtitle="SafeDocs Rwanda">
+        <Box sx={{ width: '100%' }}>
+          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1 }}>
+            <BrandLogo size={40} />
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: 1, textTransform: 'uppercase' }}>
+                SafeDocs Rwanda
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                Check your email
+              </Typography>
+            </Box>
+          </Stack>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, mt: 2 }}>
+            <MarkEmailReadIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+            <Typography variant="body2" color="text.secondary">
+              We sent a 6-digit code to <strong>{pendingEmail}</strong>
+            </Typography>
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3.5 }}>
+            Enter it below to activate your account. The code expires in 15 minutes.
+          </Typography>
+
+          <Box component="form" onSubmit={handleOtpVerify}>
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => dispatch(clearError())}>
+                {error}
+              </Alert>
+            )}
+
+            <TextField
+              required
+              fullWidth
+              label="Verification code"
+              value={otpValue}
+              onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              inputProps={{ inputMode: 'numeric', maxLength: 6, style: { letterSpacing: '0.5em', fontSize: '1.4rem', textAlign: 'center' } }}
+              disabled={loading}
+              autoFocus
+              placeholder="000000"
+            />
+
+            <Button
+              type="submit"
+              fullWidth
+              size="large"
+              variant="contained"
+              disabled={loading || otpValue.length !== 6}
+              sx={{ mt: 3, mb: 2, py: 1.4, fontWeight: 600, fontSize: '1rem', borderRadius: 2 }}
+            >
+              {loading ? <CircularProgress size={22} color="inherit" /> : 'Verify Email'}
+            </Button>
+
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                Didn't receive a code?{' '}
+                {resendCooldown > 0 ? (
+                  <Typography component="span" variant="body2" color="text.disabled">
+                    Resend in {resendCooldown}s
+                  </Typography>
+                ) : (
+                  <MuiLink
+                    component="button"
+                    type="button"
+                    underline="hover"
+                    fontWeight={600}
+                    color="primary"
+                    onClick={handleResendOtp}
+                    sx={{ cursor: 'pointer', background: 'none', border: 'none', p: 0 }}
+                  >
+                    Resend code
+                  </MuiLink>
+                )}
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+      </AuthLayout>
+    );
+  }
+
+  // ── Registration form ───────────────────────────────────────────────────────
   return (
     <AuthLayout title="Create account" subtitle="Join SafeDocs Rwanda">
       <Box sx={{ width: '100%' }}>

@@ -3,6 +3,7 @@ import { Op } from 'sequelize';
 import { User, Organization } from '../models';
 import { generateToken } from '../utils/jwt';
 import { body, validationResult } from 'express-validator';
+import { sendOtpEmail } from '../services/emailService';
 
 export const registerValidation = [
   body('username').trim().isLength({ min: 3, max: 100 }).withMessage('Username must be 3-100 characters'),
@@ -38,7 +39,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Create new user
+    // Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    // Create new user (unverified)
     const user = await User.create({
       username,
       email,
@@ -46,30 +51,18 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       fullName,
       role: 'user',
       tokenVersion: 0,
+      isEmailVerified: false,
+      otpCode: otp,
+      otpExpiresAt,
     });
 
-    // Generate token
-    const token = generateToken({
-      id: user.id,
-      userId: user.id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      tokenVersion: user.tokenVersion,
-      organizationId: user.organizationId ?? null,
-    });
+    // Send OTP email
+    await sendOtpEmail(user.email, user.fullName, otp);
 
     res.status(201).json({
-      message: 'User registered successfully',
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role,
-        organizationId: user.organizationId ?? null,
-      },
+      requiresOtp: true,
+      userId: user.id,
+      message: 'Registration successful. Check your email for a verification code.',
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -103,6 +96,22 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     // Check if user is active
     if (!user.isActive) {
       res.status(403).json({ error: 'Account is disabled' });
+      return;
+    }
+
+    // Check if email is verified
+    if (!user.isEmailVerified) {
+      // Regenerate OTP so they can complete verification
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      user.otpCode = otp;
+      user.otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      await user.save();
+      await sendOtpEmail(user.email, user.fullName, otp);
+      res.status(403).json({
+        error: 'Email not verified. A new verification code has been sent.',
+        requiresOtp: true,
+        userId: user.id,
+      });
       return;
     }
 
@@ -275,6 +284,122 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
     res.status(200).json({ message: 'Password changed successfully' });
   } catch (error) {
     console.error('Change password error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const verifyOtp = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId, otp } = req.body;
+    if (!userId || !otp) {
+      res.status(400).json({ error: 'userId and otp are required' });
+      return;
+    }
+
+    const user = await User.findByPk(userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    if (user.isEmailVerified) {
+      res.status(400).json({ error: 'Email already verified' });
+      return;
+    }
+
+    if (!user.otpCode || !user.otpExpiresAt) {
+      res.status(400).json({ error: 'No verification code found. Please request a new one.' });
+      return;
+    }
+
+    if (new Date() > user.otpExpiresAt) {
+      res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
+      return;
+    }
+
+    if (user.otpCode !== otp.toString().trim()) {
+      res.status(400).json({ error: 'Invalid verification code.' });
+      return;
+    }
+
+    // Mark verified and clear OTP
+    user.isEmailVerified = true;
+    user.otpCode = undefined;
+    user.otpExpiresAt = undefined;
+    await user.save();
+
+    let organizationName: string | undefined;
+    if (user.organizationId) {
+      const org = await Organization.findByPk(user.organizationId);
+      organizationName = org?.name;
+    }
+
+    const token = generateToken({
+      id: user.id,
+      userId: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      tokenVersion: user.tokenVersion,
+      organizationId: user.organizationId ?? null,
+    });
+
+    res.status(200).json({
+      message: 'Email verified successfully',
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        organizationId: user.organizationId ?? null,
+        organizationName,
+      },
+    });
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const resendOtp = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      res.status(400).json({ error: 'userId is required' });
+      return;
+    }
+
+    const user = await User.findByPk(userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    if (user.isEmailVerified) {
+      res.status(400).json({ error: 'Email already verified' });
+      return;
+    }
+
+    // Rate-limit: allow resend only if last OTP was sent more than 60s ago
+    if (user.otpExpiresAt) {
+      const sentAt = new Date(user.otpExpiresAt.getTime() - 15 * 60 * 1000);
+      if (Date.now() - sentAt.getTime() < 60 * 1000) {
+        res.status(429).json({ error: 'Please wait 60 seconds before requesting a new code.' });
+        return;
+      }
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.otpCode = otp;
+    user.otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    await user.save();
+    await sendOtpEmail(user.email, user.fullName, otp);
+
+    res.status(200).json({ message: 'Verification code resent. Check your email.' });
+  } catch (error) {
+    console.error('Resend OTP error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

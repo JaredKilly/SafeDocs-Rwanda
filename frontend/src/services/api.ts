@@ -78,9 +78,18 @@ class ApiService {
     return response.data;
   }
 
-  async register(data: RegisterData): Promise<AuthResponse> {
-    const response = await this.api.post<AuthResponse>('/auth/register', data);
+  async register(data: RegisterData): Promise<any> {
+    const response = await this.api.post<any>('/auth/register', data);
     return response.data;
+  }
+
+  async verifyOtp(userId: number, otp: string): Promise<AuthResponse> {
+    const response = await this.api.post<AuthResponse>('/auth/verify-otp', { userId, otp });
+    return response.data;
+  }
+
+  async resendOtp(userId: number): Promise<void> {
+    await this.api.post('/auth/resend-otp', { userId });
   }
 
   async getHealth(): Promise<HealthStatus> {

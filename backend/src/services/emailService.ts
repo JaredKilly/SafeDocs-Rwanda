@@ -194,3 +194,32 @@ export const sendAccessRequestResponse = async (data: AccessRequestResponseData)
     : `Access request declined: "${data.documentTitle}"`;
   await send(data.requesterEmail, subject, html);
 };
+
+// ─── OTP Verification Email ───────────────────────────────────────────────────
+
+export const sendOtpEmail = async (
+  email: string,
+  name: string | undefined,
+  otp: string
+): Promise<void> => {
+  const html = wrap(`
+    <h2 style="margin:0 0 8px;color:#0B1D2E;font-size:20px;">Verify your email address</h2>
+    <p style="margin:0 0 24px;color:#555;font-size:15px;">
+      Hi ${name || 'there'}, thanks for registering with SafeDocs Rwanda.<br/>
+      Enter the code below to activate your account:
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      <tr>
+        <td align="center">
+          <div style="display:inline-block;background:#F0F4FF;border:2px solid #007BFF;border-radius:12px;padding:20px 40px;">
+            <span style="font-size:36px;font-weight:700;letter-spacing:10px;color:#0B1D2E;">${otp}</span>
+          </div>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0;color:#888;font-size:13px;text-align:center;">
+      This code expires in <strong>15 minutes</strong>. Do not share it with anyone.
+    </p>
+  `);
+  await send(email, 'Your SafeDocs verification code', html);
+};

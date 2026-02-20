@@ -10,13 +10,16 @@ interface UserAttributes {
   fullName?: string;
   role: 'admin' | 'manager' | 'user';
   isActive: boolean;
+  isEmailVerified: boolean;
   tokenVersion: number;
   organizationId?: number;
+  otpCode?: string;
+  otpExpiresAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-interface UserCreationAttributes extends Optional<UserAttributes, 'id' | 'isActive' | 'role' | 'organizationId'> {}
+interface UserCreationAttributes extends Optional<UserAttributes, 'id' | 'isActive' | 'isEmailVerified' | 'role' | 'organizationId' | 'otpCode' | 'otpExpiresAt'> {}
 
 class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
   public id!: number;
@@ -26,8 +29,11 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
   public fullName?: string;
   public role!: 'admin' | 'manager' | 'user';
   public isActive!: boolean;
+  public isEmailVerified!: boolean;
   public tokenVersion!: number;
   public organizationId?: number;
+  public otpCode?: string;
+  public otpExpiresAt?: Date;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 
@@ -90,6 +96,19 @@ User.init(
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: true,
+    },
+    isEmailVerified: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    otpCode: {
+      type: DataTypes.STRING(6),
+      allowNull: true,
+    },
+    otpExpiresAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
     },
     tokenVersion: {
       type: DataTypes.INTEGER,

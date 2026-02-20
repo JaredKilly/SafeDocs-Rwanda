@@ -4,6 +4,7 @@ import {
   register, login, getProfile, registerValidation, loginValidation,
   updateProfile, updateProfileValidation,
   changePassword, changePasswordValidation,
+  verifyOtp, resendOtp,
 } from '../controllers/authController';
 import { authenticate } from '../middleware/auth';
 
@@ -20,6 +21,8 @@ const authLimiter = rateLimit({
 router.use(authLimiter);
 
 router.post('/register', registerValidation, register);
+router.post('/verify-otp', verifyOtp);
+router.post('/resend-otp', resendOtp);
 router.post('/login', loginValidation, login);
 router.get('/profile', authenticate, getProfile);
 router.put('/profile', authenticate, updateProfileValidation, updateProfile);
