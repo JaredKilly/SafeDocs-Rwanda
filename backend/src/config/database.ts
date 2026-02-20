@@ -6,9 +6,8 @@ dotenv.config();
 const isProduction = process.env.NODE_ENV === 'production';
 
 const dbUrl = process.env.DATABASE_URL || '';
-// Private Railway URLs (*.railway.internal) don't use SSL — public ones do
-const isInternalRailway = dbUrl.includes('.railway.internal');
-const sslOptions = isProduction && !isInternalRailway
+// Neon and other hosted Postgres providers require SSL in production
+const sslOptions = isProduction
   ? { ssl: { rejectUnauthorized: false } }
   : {};
 

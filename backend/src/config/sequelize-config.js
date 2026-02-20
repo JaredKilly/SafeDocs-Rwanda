@@ -23,9 +23,7 @@ module.exports = {
     logging: false,
     dialectOptions: {
       ssl: {
-        require: true,
         rejectUnauthorized: false,
-        mode: 'require',
       },
     },
   },
