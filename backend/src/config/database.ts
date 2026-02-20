@@ -6,8 +6,9 @@ dotenv.config();
 const isProduction = process.env.NODE_ENV === 'production';
 
 const dbUrl = process.env.DATABASE_URL || '';
-// Neon and other hosted Postgres providers require SSL in production
-const sslOptions = isProduction
+// Skip SSL for localhost (cPanel) — require it for hosted providers (Neon, Supabase, etc.)
+const isLocalhost = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
+const sslOptions = isProduction && !isLocalhost
   ? { ssl: { rejectUnauthorized: false } }
   : {};
 
